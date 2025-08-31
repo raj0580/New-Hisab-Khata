@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>হিসাব খাতা</title>
+    <title>ডিজিটাল হিসাব খাতা</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4338ca">
-    <link rel="apple-touch-icon" href="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_192dp.png">
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/google/material-design-icons/master/png/action/account_balance_wallet/materialicons/192dp/2x/baseline_account_balance_wallet_black_192dp.png">
 </head>
 <body>
 
@@ -17,23 +17,27 @@
         </header>
 
         <main id="app-main-content">
-            <!-- Dynamic content will be rendered here -->
             <div class="loader-container"><div class="loader"></div></div>
         </main>
 
         <nav id="bottom-nav">
-            <a href="#dashboard" class="nav-item active" data-title="ড্যাশবোর্ড">
+            <button class="nav-item active" data-page="dashboard" data-title="ড্যাশবোর্ড">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="nav-icon"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zM13 4v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
                 <span>ড্যাশবোর্ড</span>
-            </a>
-            <a href="#add" class="nav-item add-button" data-title="নতুন লেনদেন">
+            </button>
+            <button class="nav-item add-button" data-action="add-transaction">
                 +
-            </a>
-            <a href="#transactions" class="nav-item" data-title="সব লেনদেন">
+            </button>
+            <button class="nav-item" data-page="transactions" data-title="সব লেনদেন">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="nav-icon"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
                 <span>তালিকা</span>
-            </a>
+            </button>
         </nav>
+    </div>
+
+    <!-- Modal for Forms -->
+    <div id="modal-container" class="modal-overlay">
+        <!-- Modal content will be injected here by JavaScript -->
     </div>
 
     <!-- Firebase SDK -->
