@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hisab-khata-cache-v1.1';
+const CACHE_NAME = 'hisab-khata-cache-v2.1';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
