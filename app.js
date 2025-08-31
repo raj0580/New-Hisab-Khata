@@ -5,14 +5,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     // TODO: আপনার Firebase প্রজেক্টের কনফিগারেশন এখানে পেস্ট করুন।
     // Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCYgLkfEEfFzLzJBtB7lE0w0Knc4o0ws-o",
-  authDomain: "apna-meme-store-fdc5b.firebaseapp.com",
-  databaseURL: "https://apna-meme-store-fdc5b-default-rtdb.firebaseio.com",
-  projectId: "apna-meme-store-fdc5b",
-  storageBucket: "apna-meme-store-fdc5b.firebasestorage.app",
-  messagingSenderId: "703244299489",
-  appId: "1:703244299489:web:f88cead0a394bbaaf19ba0"
+  apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
+  authDomain: "new-hisab-khata.firebaseapp.com",
+  projectId: "new-hisab-khata",
+  storageBucket: "new-hisab-khata.firebasestorage.app",
+  messagingSenderId: "116945944640",
+  appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
+  measurementId: "G-R71KCTMZC6"
 };
     // =========================================================================
     // 🔥 END: FIREBASE CONFIGURATION
