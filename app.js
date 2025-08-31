@@ -4,15 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 🔥 START: FIREBASE CONFIGURATION
     // =========================================================================
     // TODO: আপনার Firebase প্রজেক্টের কনফিগারেশন এখানে পেস্ট করুন।
-    // এটি Firebase Console -> Project Settings -> General এ পাবেন।
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+    // Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCYgLkfEEfFzLzJBtB7lE0w0Knc4o0ws-o",
+  authDomain: "apna-meme-store-fdc5b.firebaseapp.com",
+  databaseURL: "https://apna-meme-store-fdc5b-default-rtdb.firebaseio.com",
+  projectId: "apna-meme-store-fdc5b",
+  storageBucket: "apna-meme-store-fdc5b.firebasestorage.app",
+  messagingSenderId: "703244299489",
+  appId: "1:703244299489:web:f88cead0a394bbaaf19ba0"
+};
     // =========================================================================
     // 🔥 END: FIREBASE CONFIGURATION
     // =========================================================================
