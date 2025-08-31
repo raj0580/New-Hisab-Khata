@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // =========================================================================
+    // 🔥 START: FIREBASE CONFIGURATION
+    // =========================================================================
     // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -11,7 +14,7 @@ const firebaseConfig = {
   appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
   measurementId: "G-R71KCTMZC6"
 };
-
+    // =========================================================================
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
@@ -60,11 +63,15 @@ const firebaseConfig = {
         `;
         document.getElementById('login-btn').addEventListener('click', () => {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider);
+            auth.signInWithPopup(provider).catch(err => console.error("Login Error:", err));
         });
     };
     
-    logoutBtn.addEventListener('click', () => auth.signOut());
+    logoutBtn.addEventListener('click', () => {
+        if(confirm("আপনি কি লগআউট করতে চান?")) {
+            auth.signOut();
+        }
+    });
 
     const checkInitialBalance = async () => {
         const userRef = db.collection('users').doc(currentUser.uid);
@@ -81,19 +88,20 @@ const firebaseConfig = {
             <div class="modal-content">
                 <div class="modal-header"><h2>শুরুর ব্যালেন্স সেট করুন</h2></div>
                 <form id="initial-balance-form" class="form-container">
-                    <p>অ্যাপটি ব্যবহারের আগে আপনার বর্তমান ক্যাশ ও অনলাইন ব্যালেন্স দিন।</p>
+                    <p>অ্যাপটি ব্যবহারের আগে আপনার বর্তমান ক্যাশ ও অনলাইন ব্যালেন্স দিন। এটি শুধুমাত্র একবারই সেট করতে পারবেন।</p>
                     <div class="form-group"><label for="start-cash">হাতে ক্যাশ কত আছে?</label><input type="number" id="start-cash" value="0" required></div>
                     <div class="form-group"><label for="start-online">অনলাইন একাউন্টে কত আছে?</label><input type="number" id="start-online" value="0" required></div>
-                    <button type="submit" class="btn">শুরু করুন</button>
+                    <button type="submit" class="btn">সেভ করে শুরু করুন</button>
                 </form>
             </div>
         `;
         modalContainer.classList.add('visible');
     };
 
-    // Page Rendering
+    // Page Rendering Logic
     const switchPage = (page, params = {}) => {
         if (!currentUser) return renderLoginUI();
+        
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         const activeNavItem = document.querySelector(`.nav-item[data-page="${page}"]`);
         if(activeNavItem) activeNavItem.classList.add('active');
@@ -101,24 +109,30 @@ const firebaseConfig = {
         appTitle.textContent = document.querySelector(`[data-page="${page}"]`).dataset.title;
 
         if (page === 'dashboard') renderDashboard();
-        if (page === 'dueManager') renderDueManager();
-        if (page === 'customerProfile') renderCustomerProfile(params.customerId);
-        if (page === 'transactions') renderAllTransactions();
+        else if (page === 'dueManager') renderDueManager();
+        else if (page === 'customerProfile') renderCustomerProfile(params.customerId);
+        else if (page === 'transactions') renderAllTransactions();
     };
 
     const renderDashboard = async () => {
         showLoader();
-        // This is a simplified dashboard. A full version would calculate daily summaries.
         mainContent.innerHTML = `
              <div class="dashboard-grid">
-                <div class="stat-card"><h3>এই ফিচারটি তৈরি করা হচ্ছে</h3><p class="amount">শীঘ্রই আসছে</p></div>
+                <div class="stat-card" style="grid-column: 1 / -1; text-align: center;">
+                    <h3>এই পেজটি এখনো তৈরি হয়নি।</h3>
+                    <p class="amount" style="font-size: 1rem; color: var(--text-light)">খুব শীঘ্রই আসছে...</p>
+                </div>
             </div>
         `;
     };
 
     const renderDueManager = async () => {
         showLoader();
-        const snapshot = await db.collection('customers').where('userId', '==', currentUser.uid).where('isActive', '==', true).orderBy('totalDue', 'desc').get();
+        const snapshot = await db.collection('customers')
+            .where('userId', '==', currentUser.uid)
+            .where('isActive', '==', true)
+            .orderBy('totalDue', 'desc')
+            .get();
         const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         mainContent.innerHTML = `
@@ -141,6 +155,7 @@ const firebaseConfig = {
         showLoader();
         const customerRef = db.collection('customers').doc(customerId);
         const customerDoc = await customerRef.get();
+        if(!customerDoc.exists) return renderDueManager();
         const customer = { id: customerDoc.id, ...customerDoc.data() };
 
         const txSnapshot = await db.collection('transactions')
@@ -183,12 +198,15 @@ const firebaseConfig = {
     
     const renderAllTransactions = async () => {
         showLoader();
-         mainContent.innerHTML = `
+        mainContent.innerHTML = `
              <div class="dashboard-grid">
-                <div class="stat-card"><h3>এই ফিচারটি তৈরি করা হচ্ছে</h3><p class="amount">শীঘ্রই আসছে</p></div>
+                 <div class="stat-card" style="grid-column: 1 / -1; text-align: center;">
+                    <h3>এই পেজটি এখনো তৈরি হয়নি।</h3>
+                    <p class="amount" style="font-size: 1rem; color: var(--text-light)">খুব শীঘ্রই আসছে...</p>
+                </div>
             </div>
         `;
-    }
+    };
 
     const renderAddDueForm = () => {
         modalContainer.innerHTML = `
@@ -205,7 +223,7 @@ const firebaseConfig = {
                         <p><span>জমা:</span><span id="display-paid">৳ 0.00</span></p>
                         <p class="final-due"><span>বাকি থাকবে:</span><span id="display-due">৳ 0.00</span></p>
                     </div>
-                    <button type="submit" class="btn">সেভ করুন</button>
+                    <button type="submit" class="btn" id="save-due-btn">সেভ করুন</button>
                 </form>
             </div>
         `;
@@ -228,19 +246,26 @@ const firebaseConfig = {
         const online = parseFloat(document.getElementById('start-online').value);
         
         const userRef = db.collection('users').doc(currentUser.uid);
-        await userRef.set({ initialBalanceSet: true, openingCash: cash, openingOnline: online }, { merge: true });
-
-        hideModal();
-        switchPage('dashboard');
+        try {
+            await userRef.set({ initialBalanceSet: true, openingCash: cash, openingOnline: online }, { merge: true });
+            hideModal();
+            switchPage('dashboard');
+        } catch (error) {
+            console.error("Error setting initial balance:", error);
+            alert("ব্যালেন্স সেভ করা যায়নি।");
+        }
     };
 
     const handleSaveDueTransaction = async (e) => {
         e.preventDefault();
+        const saveBtn = document.getElementById('save-due-btn');
+        saveBtn.disabled = true;
+
         const batch = db.batch();
         const totalBill = parseFloat(document.getElementById('total-bill').value);
         const amountPaid = parseFloat(document.getElementById('amount-paid').value);
         const dueAmount = totalBill - amountPaid;
-        const customerName = document.getElementById('customer-name').value;
+        const customerName = document.getElementById('customer-name').value.trim();
         const customerPhone = document.getElementById('customer-phone').value;
         const reason = document.getElementById('reason').value;
 
@@ -254,7 +279,14 @@ const firebaseConfig = {
             batch.update(customerRef, { totalDue: firebase.firestore.FieldValue.increment(dueAmount) });
         }
 
-        if (amountPaid > 0) { /* Paid amount transaction */ }
+        if (amountPaid > 0) {
+            const cashInTxRef = db.collection('transactions').doc();
+            batch.set(cashInTxRef, {
+                amount: amountPaid, type: 'cash_in', reason: `${customerName} এর কাছ থেকে জমা`,
+                date: todayString, userId: currentUser.uid, isActive: true,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
         
         if (dueAmount > 0) {
             const dueTxRef = db.collection('transactions').doc();
@@ -264,9 +296,16 @@ const firebaseConfig = {
                 isActive: true, timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
-        await batch.commit();
-        hideModal();
-        switchPage('dueManager');
+        
+        try {
+            await batch.commit();
+            hideModal();
+            switchPage('dueManager');
+        } catch(error) {
+            console.error("Due Save Error:", error);
+            alert("লেনদেনটি সেভ করা যায়নি।");
+            saveBtn.disabled = false;
+        }
     };
     
     const handleReceiveDue = async (e) => {
@@ -286,12 +325,17 @@ const firebaseConfig = {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        await batch.commit();
-        renderCustomerProfile(customerId);
+        try {
+            await batch.commit();
+            renderCustomerProfile(customerId);
+        } catch(error) {
+            console.error("Receive Due Error:", error);
+            alert("টাকা জমা করা যায়নি।");
+        }
     };
 
     const handleDeleteTransaction = async (txId, txAmount, txType, customerId) => {
-        if (!confirm("আপনি কি এই লেনদেনটি ডিলিট করতে নিশ্চিত?")) return;
+        if (!confirm("আপনি কি এই লেনদেনটি ডিলিট করতে নিশ্চিত? এটি আর ফিরিয়ে আনা যাবে না।")) return;
         
         const batch = db.batch();
         const txRef = db.collection('transactions').doc(txId);
@@ -301,39 +345,41 @@ const firebaseConfig = {
         const increment = txType === 'due_add' ? -txAmount : txAmount;
         batch.update(customerRef, { totalDue: firebase.firestore.FieldValue.increment(increment) });
 
-        await batch.commit();
-        renderCustomerProfile(customerId);
+        try {
+            await batch.commit();
+            renderCustomerProfile(customerId);
+        } catch(error) {
+            console.error("Delete Error:", error);
+            alert("লেনদেনটি ডিলিট করা যায়নি।");
+        }
     };
 
-    // Event Listeners
+    // Event Delegation
     document.body.addEventListener('click', (e) => {
         const pageTarget = e.target.closest('[data-page]');
         const actionTarget = e.target.closest('[data-action]');
         const customerTarget = e.target.closest('[data-customer-id]');
         const deleteBtn = e.target.closest('.delete-btn');
+        const closeModalBtn = e.target.closest('.modal-close-btn');
 
         if (pageTarget) switchPage(pageTarget.dataset.page);
-        if (actionTarget) renderAddDueForm();
-        if (customerTarget) switchPage('customerProfile', { customerId: customerTarget.dataset.customerId });
-        if (deleteBtn) {
+        else if (actionTarget) renderAddDueForm();
+        else if (customerTarget) switchPage('customerProfile', { customerId: customerTarget.dataset.customerId });
+        else if (deleteBtn) {
             const customerId = document.getElementById('receive-due-form').dataset.customerId;
             handleDeleteTransaction(deleteBtn.dataset.txId, parseFloat(deleteBtn.dataset.txAmount), deleteBtn.dataset.txType, customerId);
         }
+        else if (closeModalBtn) hideModal();
     });
 
     modalContainer.addEventListener('submit', (e) => {
+        e.preventDefault();
         if (e.target.id === 'initial-balance-form') handleSaveInitialBalance(e);
         if (e.target.id === 'due-form') handleSaveDueTransaction(e);
     });
     
     mainContent.addEventListener('submit', (e) => {
+        e.preventDefault();
         if (e.target.id === 'receive-due-form') handleReceiveDue(e);
-    });
-
-    // Initial Load & Service Worker
-    window.addEventListener('load', () => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed: ', err));
-        }
     });
 });
