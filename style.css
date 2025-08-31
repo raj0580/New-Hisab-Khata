@@ -49,8 +49,8 @@ body {
 #app-main-content {
     flex-grow: 1;
     padding: 1rem;
-    padding-top: 5rem; /* Header height + space */
-    padding-bottom: 6rem; /* Nav height + space */
+    padding-top: 5rem;
+    padding-bottom: 6rem;
     overflow-y: auto;
 }
 
@@ -71,6 +71,7 @@ body {
     background-color: var(--card-bg);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     height: 60px;
+    z-index: 100;
 }
 .nav-item {
     display: flex;
@@ -82,6 +83,9 @@ body {
     flex-grow: 1;
     padding: 5px 0;
     font-size: 0.75rem;
+    border: none;
+    background: none;
+    cursor: pointer;
 }
 .nav-item.active { color: var(--primary-color); }
 .nav-icon { width: 24px; height: 24px; margin-bottom: 2px; }
@@ -124,7 +128,7 @@ body {
 }
 .stat-card .amount {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 600;
     word-wrap: break-word;
 }
@@ -132,7 +136,78 @@ body {
 .amount.negative { color: var(--red); }
 .total-due { color: var(--yellow); }
 
-/* Forms */
+.quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    border-radius: 8px;
+    background-color: var(--card-bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-dark);
+}
+.action-btn:hover { border-color: var(--primary-color); }
+
+.daily-close-btn {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+/* Forms (in Modal) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+.modal-content {
+    background: var(--background-color);
+    padding: 1.5rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.9);
+    transition: transform 0.3s;
+}
+.modal-overlay.visible .modal-content {
+    transform: scale(1);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.modal-header h2 { margin: 0; font-size: 1.25rem; }
+.modal-close-btn { font-size: 1.5rem; border: none; background: none; cursor: pointer; }
+
 .form-container { display: flex; flex-direction: column; gap: 1rem; }
 .form-group label {
     display: block;
@@ -182,11 +257,15 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
+    width: 100%;
 }
 .btn:hover { background-color: var(--primary-dark); }
 .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
 
 /* Transaction List */
+.filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.filters input, .filters select { padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; }
+
 .transaction-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .transaction-item {
     display: flex;
@@ -206,6 +285,7 @@ body {
     justify-content: center;
     color: white;
     font-weight: bold;
+    flex-shrink: 0;
 }
 .transaction-icon.in { background-color: var(--green); }
 .transaction-icon.out { background-color: var(--red); }
@@ -216,3 +296,5 @@ body {
 .transaction-reason { font-weight: 600; }
 .transaction-meta { font-size: 0.8rem; color: var(--text-light); }
 .transaction-amount { font-weight: 600; text-align: right; }
+
+.hidden { display: none !important; }
