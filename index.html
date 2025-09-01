@@ -51,6 +51,10 @@
                 <label for="date-picker">দিন দেখুন:</label>
                 <input type="date" id="date-picker">
             </div>
+            <div id="daily-summary" class="card" style="display: none; margin-top: 15px; background-color: #e3f2fd;">
+                <h3 class="card-title" id="summary-date-title">দিনের শেষে ব্যালেন্স</h3>
+                <p id="daily-summary-text">অনলাইন: ৳0.00 | ক্যাশ: ৳0.00</p>
+            </div>
             
             <h2 class="section-title">নতুন লেনদেন যোগ করুন</h2>
             <form id="transaction-form">
@@ -74,15 +78,38 @@
         </div>
     </div>
     
+    <!-- *** Advanced Due Details Modal *** -->
     <div id="due-details-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h2 id="modal-customer-name"></h2><span class="close-btn">&times;</span></div>
+            <div class="modal-header">
+                <h2 id="modal-customer-name"></h2>
+                <span class="close-btn">&times;</span>
+            </div>
             <div id="modal-body">
-                <p><strong>মোট বকেয়া:</strong> <span id="modal-remaining-due"></span></p>
-                <h3>পেমেন্ট ইতিহাস</h3><ul id="modal-payment-history"></ul>
-                <h3>নতুন পেমেন্ট যোগ করুন</h3>
-                <input type="number" id="new-payment-amount" placeholder="পেমেন্টের পরিমাণ">
-                <button id="add-payment-btn">পেমেন্ট যোগ করুন</button>
+                <div class="due-summary">
+                    <div><strong>মোট:</strong> <span id="modal-total-due"></span></div>
+                    <div><strong>পরিশোধ:</strong> <span id="modal-paid-due"></span></div>
+                    <div><strong>বাকি:</strong> <span id="modal-remaining-due"></span></div>
+                </div>
+
+                <!-- Items Section -->
+                <h3>আইটেম তালিকা</h3>
+                <ul id="modal-item-list"></ul>
+                <div class="add-new-item-form">
+                    <h4>নতুন আইটেম যোগ করুন</h4>
+                    <input type="text" id="new-item-name" placeholder="আইটেমের নাম">
+                    <input type="number" id="new-item-amount" placeholder="দাম (৳)">
+                    <button id="add-item-btn">আইটেম যোগ করুন</button>
+                </div>
+                
+                <!-- Payments Section -->
+                <h3>পেমেন্ট ইতিহাস</h3>
+                <ul id="modal-payment-history"></ul>
+                <div class="add-new-payment-form">
+                    <h4>নতুন পেমেন্ট যোগ করুন</h4>
+                    <input type="number" id="new-payment-amount" placeholder="পেমেন্টের পরিমাণ">
+                    <button id="add-payment-btn">পেমেন্ট যোগ করুন</button>
+                </div>
             </div>
         </div>
     </div>
