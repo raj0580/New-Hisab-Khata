@@ -1,9 +1,11 @@
 // Firebase SDK-এর মডিউলগুলো সরাসরি CDN থেকে ইম্পোর্ট করুন
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enablePersistence } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+// এখানে enablePersistence এর পরিবর্তে enableIndexedDbPersistence ইম্পোর্ট করা হয়েছে
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-// Step 1: Register Service Worker
+// Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -17,31 +19,31 @@ if ('serviceWorker' in navigator) {
 }
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
-  authDomain: "new-hisab-khata.firebaseapp.com",
-  databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
-  projectId: "new-hisab-khata",
-  storageBucket: "new-hisab-khata.firebasestorage.app",
-  messagingSenderId: "116945944640",
-  appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
-  measurementId: "G-R71KCTMZC6"
-};
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
+    authDomain: "new-hisab-khata.firebaseapp.com",
+    databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
+    projectId: "new-hisab-khata",
+    storageBucket: "new-hisab-khata.firebasestorage.app",
+    messagingSenderId: "116945944640",
+    appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
+    measurementId: "G-R71KCTMZC6"
+  };
+
 
 // Firebase ইনিশিয়ালাইজ করুন
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Step 2: Firestore Offline Persistence চালু করুন
-enablePersistence(db)
+// Firestore Offline Persistence চালু করুন
+// এখানে ফাংশনের নাম পরিবর্তন করা হয়েছে
+enableIndexedDbPersistence(db)
   .catch(err => {
     if (err.code == 'failed-precondition') {
-      // একাধিক ট্যাব খোলা থাকলে এই সমস্যা হতে পারে
       console.log('Persistence failed, probably multiple tabs open');
     } else if (err.code == 'unimplemented') {
-      // ব্রাউজার সাপোর্ট না করলে
       console.log('Persistence is not available in this browser');
     }
   });
