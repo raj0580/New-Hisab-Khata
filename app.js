@@ -1,385 +1,264 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-    // =========================================================================
-    // 🔥 START: FIREBASE CONFIGURATION
-    // =========================================================================
-    // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// আপনার Firebase প্রজেক্টের কনফিগারেশন এখানে পেস্ট করুন
 const firebaseConfig = {
-  apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
-  authDomain: "new-hisab-khata.firebaseapp.com",
-  projectId: "new-hisab-khata",
-  storageBucket: "new-hisab-khata.firebasestorage.app",
-  messagingSenderId: "116945944640",
-  appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
-  measurementId: "G-R71KCTMZC6"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
-    // =========================================================================
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+// Firebase ইনিশিয়ালাইজ করুন
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-    // DOM Elements
-    const mainContent = document.getElementById('app-main-content');
-    const appTitle = document.getElementById('app-title');
-    const modalContainer = document.getElementById('modal-container');
-    const bottomNav = document.getElementById('bottom-nav');
-    const logoutBtn = document.getElementById('logout-btn');
+// DOM Elements
+const authContainer = document.getElementById('auth-container');
+const appContainer = document.getElementById('app-container');
+const setupScreen = document.getElementById('setup-screen');
+const mainApp = document.getElementById('main-app');
+const loginBtn = document.getElementById('login-btn');
+const signupLink = document.getElementById('signup-link');
+const logoutBtn = document.getElementById('logout-btn');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
 
-    // App State
-    let currentUser = null;
-    let todayString = new Date().toISOString().slice(0, 10);
+const initialOnlineBalanceInput = document.getElementById('initial-online-balance');
+const initialCashBalanceInput = document.getElementById('initial-cash-balance');
+const saveInitialBalanceBtn = document.getElementById('save-initial-balance');
 
-    // Helper Functions
-    const formatCurrency = (amount) => `৳ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const formatDate = (timestamp) => timestamp ? new Date(timestamp.seconds * 1000).toLocaleDateString('bn-BD') : '';
-    const showLoader = () => mainContent.innerHTML = `<div class="loader-container"><div class="loader"></div></div>`;
-    const hideModal = () => modalContainer.classList.remove('visible');
+const onlineBalanceEl = document.getElementById('online-balance');
+const cashBalanceEl = document.getElementById('cash-balance');
+const totalBalanceEl = document.getElementById('total-balance');
+const todayIncomeEl = document.getElementById('today-income');
+const todayExpenseEl = document.getElementById('today-expense');
 
-    // Authentication Logic
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            currentUser = user;
-            logoutBtn.style.display = 'block';
-            bottomNav.style.display = 'flex';
-            checkInitialBalance();
-        } else {
-            currentUser = null;
-            logoutBtn.style.display = 'none';
-            bottomNav.style.display = 'none';
-            renderLoginUI();
-        }
-    });
+const categorySelect = document.getElementById('category');
+const amountInput = document.getElementById('amount');
+const descriptionInput = document.getElementById('description');
+const customerNameInput = document.getElementById('customer-name');
+const addTransactionBtn = document.getElementById('add-transaction-btn');
 
-    const renderLoginUI = () => {
-        mainContent.innerHTML = `
-            <div style="text-align: center; padding-top: 50px;">
-                <h2>ডিজিটাল হিসাব খাতায় স্বাগতম</h2>
-                <p>শুরু করতে অনুগ্রহ করে গুগল দিয়ে লগইন করুন।</p>
-                <button id="login-btn" class="btn">গুগল দিয়ে লগইন করুন</button>
-            </div>
-        `;
-        document.getElementById('login-btn').addEventListener('click', () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(err => console.error("Login Error:", err));
-        });
-    };
-    
-    logoutBtn.addEventListener('click', () => {
-        if(confirm("আপনি কি লগআউট করতে চান?")) {
-            auth.signOut();
-        }
-    });
+const transactionsUl = document.getElementById('transactions');
+const duesUl = document.getElementById('dues');
 
-    const checkInitialBalance = async () => {
-        const userRef = db.collection('users').doc(currentUser.uid);
-        const userDoc = await userRef.get();
-        if (!userDoc.exists || !userDoc.data().initialBalanceSet) {
-            renderInitialBalanceForm();
-        } else {
-            switchPage('dashboard');
-        }
-    };
+let currentUser;
 
-    const renderInitialBalanceForm = () => {
-        modalContainer.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>শুরুর ব্যালেন্স সেট করুন</h2></div>
-                <form id="initial-balance-form" class="form-container">
-                    <p>অ্যাপটি ব্যবহারের আগে আপনার বর্তমান ক্যাশ ও অনলাইন ব্যালেন্স দিন। এটি শুধুমাত্র একবারই সেট করতে পারবেন।</p>
-                    <div class="form-group"><label for="start-cash">হাতে ক্যাশ কত আছে?</label><input type="number" id="start-cash" value="0" required></div>
-                    <div class="form-group"><label for="start-online">অনলাইন একাউন্টে কত আছে?</label><input type="number" id="start-online" value="0" required></div>
-                    <button type="submit" class="btn">সেভ করে শুরু করুন</button>
-                </form>
-            </div>
-        `;
-        modalContainer.classList.add('visible');
-    };
-
-    // Page Rendering Logic
-    const switchPage = (page, params = {}) => {
-        if (!currentUser) return renderLoginUI();
-        
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        const activeNavItem = document.querySelector(`.nav-item[data-page="${page}"]`);
-        if(activeNavItem) activeNavItem.classList.add('active');
-
-        appTitle.textContent = document.querySelector(`[data-page="${page}"]`).dataset.title;
-
-        if (page === 'dashboard') renderDashboard();
-        else if (page === 'dueManager') renderDueManager();
-        else if (page === 'customerProfile') renderCustomerProfile(params.customerId);
-        else if (page === 'transactions') renderAllTransactions();
-    };
-
-    const renderDashboard = async () => {
-        showLoader();
-        mainContent.innerHTML = `
-             <div class="dashboard-grid">
-                <div class="stat-card" style="grid-column: 1 / -1; text-align: center;">
-                    <h3>এই পেজটি এখনো তৈরি হয়নি।</h3>
-                    <p class="amount" style="font-size: 1rem; color: var(--text-light)">খুব শীঘ্রই আসছে...</p>
-                </div>
-            </div>
-        `;
-    };
-
-    const renderDueManager = async () => {
-        showLoader();
-        const snapshot = await db.collection('customers')
-            .where('userId', '==', currentUser.uid)
-            .where('isActive', '==', true)
-            .orderBy('totalDue', 'desc')
-            .get();
-        const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        mainContent.innerHTML = `
-            <div class="customer-list">
-                ${customers.length === 0 ? `<p style="text-align:center;">কোনো কাস্টমারের বাকি নেই।</p>` :
-                customers.map(cust => `
-                    <div class="customer-item" data-customer-id="${cust.id}">
-                        <div class="customer-info">
-                            <p class="name">${cust.name}</p>
-                            <p class="phone">${cust.phone || 'N/A'}</p>
-                        </div>
-                        <p class="amount total-due">${formatCurrency(cust.totalDue)}</p>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    };
-
-    const renderCustomerProfile = async (customerId) => {
-        showLoader();
-        const customerRef = db.collection('customers').doc(customerId);
-        const customerDoc = await customerRef.get();
-        if(!customerDoc.exists) return renderDueManager();
-        const customer = { id: customerDoc.id, ...customerDoc.data() };
-
-        const txSnapshot = await db.collection('transactions')
-            .where('customerId', '==', customerId)
-            .where('isActive', '==', true)
-            .orderBy('timestamp', 'desc').get();
-        const transactions = txSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        mainContent.innerHTML = `
-            <div class="customer-profile-header">
-                <h2>${customer.name}</h2>
-                <p>${customer.phone || 'ফোন নম্বর নেই'}</p>
-                <div class="total-due-display">${formatCurrency(customer.totalDue)}</div>
-            </div>
-            <form id="receive-due-form" class="form-container" style="margin-bottom: 1.5rem;">
-                <div class="form-group">
-                    <label for="amount-received">আজ দিল (টাকা)</label>
-                    <input type="number" id="amount-received" placeholder="টাকার পরিমাণ লিখুন" required>
-                </div>
-                <button type="submit" class="btn">জমা করুন</button>
-            </form>
-            <h3>লেনদেনের তালিকা</h3>
-            <div class="transaction-list">
-                ${transactions.length === 0 ? `<p>কোনো লেনদেন নেই।</p>` :
-                transactions.map(tx => `
-                    <div class="transaction-item">
-                        <div class="transaction-icon ${tx.type === 'due_add' ? 'due' : 'in'}">${tx.type === 'due_add' ? 'DA' : 'DR'}</div>
-                        <div class="transaction-details">
-                            <p class="transaction-reason">${tx.reason}</p>
-                            <p class="transaction-meta">${formatDate(tx.timestamp)}</p>
-                        </div>
-                        <p class="transaction-amount">${formatCurrency(tx.amount)}</p>
-                        <button class="delete-btn" data-tx-id="${tx.id}" data-tx-amount="${tx.amount}" data-tx-type="${tx.type}">&#10005;</button>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        document.getElementById('receive-due-form').dataset.customerId = customerId;
-    };
-    
-    const renderAllTransactions = async () => {
-        showLoader();
-        mainContent.innerHTML = `
-             <div class="dashboard-grid">
-                 <div class="stat-card" style="grid-column: 1 / -1; text-align: center;">
-                    <h3>এই পেজটি এখনো তৈরি হয়নি।</h3>
-                    <p class="amount" style="font-size: 1rem; color: var(--text-light)">খুব শীঘ্রই আসছে...</p>
-                </div>
-            </div>
-        `;
-    };
-
-    const renderAddDueForm = () => {
-        modalContainer.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>বাকিতে বিক্রয়</h2><button class="modal-close-btn" data-action="close-modal">&times;</button></div>
-                <form id="due-form" class="form-container">
-                    <div class="form-group"><label for="customer-name">কাস্টমারের নাম</label><input type="text" id="customer-name" required></div>
-                    <div class="form-group"><label for="customer-phone">ফোন (ঐচ্ছিক)</label><input type="tel" id="customer-phone"></div>
-                    <div class="form-group"><label for="reason">বিবরণ (যেমন: রিচার্জ)</label><input type="text" id="reason" required></div>
-                    <div class="form-group"><label for="total-bill">মোট বিল</label><input type="number" id="total-bill" required></div>
-                    <div class="form-group"><label for="amount-paid">জমা দিল</label><input type="number" id="amount-paid" value="0" required></div>
-                    <div class="due-calculation">
-                        <p><span>মোট বিল:</span><span id="display-total">৳ 0.00</span></p>
-                        <p><span>জমা:</span><span id="display-paid">৳ 0.00</span></p>
-                        <p class="final-due"><span>বাকি থাকবে:</span><span id="display-due">৳ 0.00</span></p>
-                    </div>
-                    <button type="submit" class="btn" id="save-due-btn">সেভ করুন</button>
-                </form>
-            </div>
-        `;
-        modalContainer.classList.add('visible');
-        ['total-bill', 'amount-paid'].forEach(id => document.getElementById(id).addEventListener('input', updateDueCalculation));
-    };
-
-    function updateDueCalculation() {
-        const total = parseFloat(document.getElementById('total-bill').value) || 0;
-        const paid = parseFloat(document.getElementById('amount-paid').value) || 0;
-        document.getElementById('display-total').textContent = formatCurrency(total);
-        document.getElementById('display-paid').textContent = formatCurrency(paid);
-        document.getElementById('display-due').textContent = formatCurrency(total - paid);
+// Auth State Change Listener
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        authContainer.style.display = 'none';
+        appContainer.style.display = 'block';
+        checkInitialBalance();
+        loadDashboardData();
+        loadTransactions();
+    } else {
+        currentUser = null;
+        authContainer.style.display = 'block';
+        appContainer.style.display = 'none';
     }
-    
-    // Data Handling Logic
-    const handleSaveInitialBalance = async (e) => {
-        e.preventDefault();
-        const cash = parseFloat(document.getElementById('start-cash').value);
-        const online = parseFloat(document.getElementById('start-online').value);
-        
-        const userRef = db.collection('users').doc(currentUser.uid);
-        try {
-            await userRef.set({ initialBalanceSet: true, openingCash: cash, openingOnline: online }, { merge: true });
-            hideModal();
-            switchPage('dashboard');
-        } catch (error) {
-            console.error("Error setting initial balance:", error);
-            alert("ব্যালেন্স সেভ করা যায়নি।");
-        }
-    };
+});
 
-    const handleSaveDueTransaction = async (e) => {
-        e.preventDefault();
-        const saveBtn = document.getElementById('save-due-btn');
-        saveBtn.disabled = true;
+// Login and Signup
+loginBtn.addEventListener('click', () => {
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    signInWithEmailAndPassword(auth, email, password).catch(error => alert(error.message));
+});
 
-        const batch = db.batch();
-        const totalBill = parseFloat(document.getElementById('total-bill').value);
-        const amountPaid = parseFloat(document.getElementById('amount-paid').value);
-        const dueAmount = totalBill - amountPaid;
-        const customerName = document.getElementById('customer-name').value.trim();
-        const customerPhone = document.getElementById('customer-phone').value;
-        const reason = document.getElementById('reason').value;
+signupLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    createUserWithEmailAndPassword(auth, email, password).catch(error => alert(error.message));
+});
 
-        const customerQuery = await db.collection('customers').where('name', '==', customerName).where('userId', '==', currentUser.uid).get();
-        let customerRef;
-        if (customerQuery.empty) {
-            customerRef = db.collection('customers').doc();
-            batch.set(customerRef, { name: customerName, phone: customerPhone, totalDue: dueAmount, userId: currentUser.uid, isActive: true });
-        } else {
-            customerRef = customerQuery.docs[0].ref;
-            batch.update(customerRef, { totalDue: firebase.firestore.FieldValue.increment(dueAmount) });
-        }
+// Logout
+logoutBtn.addEventListener('click', () => {
+    signOut(auth);
+});
 
-        if (amountPaid > 0) {
-            const cashInTxRef = db.collection('transactions').doc();
-            batch.set(cashInTxRef, {
-                amount: amountPaid, type: 'cash_in', reason: `${customerName} এর কাছ থেকে জমা`,
-                date: todayString, userId: currentUser.uid, isActive: true,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-        
-        if (dueAmount > 0) {
-            const dueTxRef = db.collection('transactions').doc();
-            batch.set(dueTxRef, {
-                amount: dueAmount, type: 'due_add', reason, date: todayString,
-                customerId: customerRef.id, customerName, userId: currentUser.uid,
-                isActive: true, timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-        
-        try {
-            await batch.commit();
-            hideModal();
-            switchPage('dueManager');
-        } catch(error) {
-            console.error("Due Save Error:", error);
-            alert("লেনদেনটি সেভ করা যায়নি।");
-            saveBtn.disabled = false;
-        }
-    };
-    
-    const handleReceiveDue = async (e) => {
-        e.preventDefault();
-        const customerId = e.target.dataset.customerId;
-        const amount = parseFloat(document.getElementById('amount-received').value);
-        if (!amount || amount <= 0) return alert("টাকার পরিমাণ সঠিক নয়।");
-        
-        const batch = db.batch();
-        const customerRef = db.collection('customers').doc(customerId);
-        batch.update(customerRef, { totalDue: firebase.firestore.FieldValue.increment(-amount) });
+// Check for initial balance
+async function checkInitialBalance() {
+    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    const balanceDoc = await getDoc(balanceDocRef);
+    if (balanceDoc.exists()) {
+        setupScreen.style.display = 'none';
+        mainApp.style.display = 'block';
+    } else {
+        setupScreen.style.display = 'block';
+        mainApp.style.display = 'none';
+    }
+}
 
-        const txRef = db.collection('transactions').doc();
-        batch.set(txRef, {
-            amount, type: 'due_receive', reason: `বাকি আদায়`, date: todayString,
-            customerId, userId: currentUser.uid, isActive: true,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+// Save initial balance
+saveInitialBalanceBtn.addEventListener('click', async () => {
+    const online = parseFloat(initialOnlineBalanceInput.value) || 0;
+    const cash = parseFloat(initialCashBalanceInput.value) || 0;
+
+    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    await setDoc(balanceDocRef, { online, cash });
+
+    setupScreen.style.display = 'none';
+    mainApp.style.display = 'block';
+    loadDashboardData();
+});
+
+// Load dashboard data
+function loadDashboardData() {
+    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    onSnapshot(balanceDocRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            onlineBalanceEl.textContent = `৳${data.online.toFixed(2)}`;
+            cashBalanceEl.textContent = `৳${data.cash.toFixed(2)}`;
+            totalBalanceEl.textContent = `৳${(data.online + data.cash).toFixed(2)}`;
+        }
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'), where('timestamp', '>=', today));
+    onSnapshot(transactionsQuery, (snapshot) => {
+        let income = 0;
+        let expense = 0;
+        snapshot.forEach(doc => {
+            const transaction = doc.data();
+            if (transaction.type === 'income') {
+                income += transaction.amount;
+            } else if (transaction.type === 'expense') {
+                expense += transaction.amount;
+            }
         });
-        
-        try {
-            await batch.commit();
-            renderCustomerProfile(customerId);
-        } catch(error) {
-            console.error("Receive Due Error:", error);
-            alert("টাকা জমা করা যায়নি।");
-        }
+        todayIncomeEl.textContent = `৳${income.toFixed(2)}`;
+        todayExpenseEl.textContent = `৳${expense.toFixed(2)}`;
+    });
+}
+
+// Category change handler
+categorySelect.addEventListener('change', () => {
+    if (categorySelect.value === 'due') {
+        customerNameInput.style.display = 'block';
+    } else {
+        customerNameInput.style.display = 'none';
+    }
+});
+
+// Add transaction
+addTransactionBtn.addEventListener('click', async () => {
+    const category = categorySelect.value;
+    const amount = parseFloat(amountInput.value);
+    const description = descriptionInput.value;
+    const customerName = customerNameInput.value;
+
+    if (!amount) {
+        alert('Please enter an amount.');
+        return;
+    }
+
+    const transactionData = {
+        category,
+        amount,
+        description,
+        timestamp: serverTimestamp()
     };
 
-    const handleDeleteTransaction = async (txId, txAmount, txType, customerId) => {
-        if (!confirm("আপনি কি এই লেনদেনটি ডিলিট করতে নিশ্চিত? এটি আর ফিরিয়ে আনা যাবে না।")) return;
+    if (category === 'due') {
+        if (!customerName) {
+            alert('Please enter a customer name for due.');
+            return;
+        }
+        transactionData.customerName = customerName;
+        transactionData.paid = false;
+    }
+
+    if (category.includes('income')) {
+        transactionData.type = 'income';
+    } else if (category.includes('expense')) {
+        transactionData.type = 'expense';
+    }
+
+    // Add transaction to Firestore
+    await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), transactionData);
+
+    // Update balance
+    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    const balanceDoc = await getDoc(balanceDocRef);
+    if (balanceDoc.exists()) {
+        const currentBalance = balanceDoc.data();
+        let newOnline = currentBalance.online;
+        let newCash = currentBalance.cash;
+
+        if (category === 'online-income') newOnline += amount;
+        if (category === 'cash-income') newCash += amount;
+        if (category === 'online-expense') newOnline -= amount;
+        if (category === 'cash-expense') newCash -= amount;
+
+        await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+    }
+
+    // Clear form
+    amountInput.value = '';
+    descriptionInput.value = '';
+    customerNameInput.value = '';
+});
+
+// Load transactions and dues
+function loadTransactions() {
+    const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'));
+    onSnapshot(transactionsQuery, (snapshot) => {
+        transactionsUl.innerHTML = '';
+        duesUl.innerHTML = '';
+        snapshot.forEach(doc => {
+            const transaction = doc.data();
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${transaction.category}: ৳${transaction.amount} ${transaction.description ? `(${transaction.description})` : ''}</span>
+                <button class="delete-btn" data-id="${doc.id}">Delete</button>
+            `;
+            if (transaction.category === 'due') {
+                duesUl.appendChild(li);
+            } else {
+                transactionsUl.appendChild(li);
+            }
+        });
+    });
+}
+
+// Delete transaction
+appContainer.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('delete-btn')) {
+        const id = e.target.dataset.id;
+        const transactionDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
         
-        const batch = db.batch();
-        const txRef = db.collection('transactions').doc(txId);
-        batch.update(txRef, { isActive: false });
+        // Get transaction to revert balance
+        const transactionDoc = await getDoc(transactionDocRef);
+        if (transactionDoc.exists()) {
+            const transaction = transactionDoc.data();
+            
+            const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+            const balanceDoc = await getDoc(balanceDocRef);
+            if (balanceDoc.exists()) {
+                const currentBalance = balanceDoc.data();
+                let newOnline = currentBalance.online;
+                let newCash = currentBalance.cash;
 
-        const customerRef = db.collection('customers').doc(customerId);
-        const increment = txType === 'due_add' ? -txAmount : txAmount;
-        batch.update(customerRef, { totalDue: firebase.firestore.FieldValue.increment(increment) });
+                if (transaction.category === 'online-income') newOnline -= transaction.amount;
+                if (transaction.category === 'cash-income') newCash -= transaction.amount;
+                if (transaction.category === 'online-expense') newOnline += transaction.amount;
+                if (transaction.category === 'cash-expense') newCash += transaction.amount;
 
-        try {
-            await batch.commit();
-            renderCustomerProfile(customerId);
-        } catch(error) {
-            console.error("Delete Error:", error);
-            alert("লেনদেনটি ডিলিট করা যায়নি।");
+                await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+            }
         }
-    };
-
-    // Event Delegation
-    document.body.addEventListener('click', (e) => {
-        const pageTarget = e.target.closest('[data-page]');
-        const actionTarget = e.target.closest('[data-action]');
-        const customerTarget = e.target.closest('[data-customer-id]');
-        const deleteBtn = e.target.closest('.delete-btn');
-        const closeModalBtn = e.target.closest('.modal-close-btn');
-
-        if (pageTarget) switchPage(pageTarget.dataset.page);
-        else if (actionTarget) renderAddDueForm();
-        else if (customerTarget) switchPage('customerProfile', { customerId: customerTarget.dataset.customerId });
-        else if (deleteBtn) {
-            const customerId = document.getElementById('receive-due-form').dataset.customerId;
-            handleDeleteTransaction(deleteBtn.dataset.txId, parseFloat(deleteBtn.dataset.txAmount), deleteBtn.dataset.txType, customerId);
-        }
-        else if (closeModalBtn) hideModal();
-    });
-
-    modalContainer.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (e.target.id === 'initial-balance-form') handleSaveInitialBalance(e);
-        if (e.target.id === 'due-form') handleSaveDueTransaction(e);
-    });
-    
-    mainContent.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (e.target.id === 'receive-due-form') handleReceiveDue(e);
-    });
+        
+        await deleteDoc(transactionDocRef);
+    }
 });
