@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>আমার ব্যবসার হিসাব</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2196F3"> <!-- New Blue Theme Color -->
+    <meta name="theme-color" content="#2196F3">
     <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
 </head>
 <body>
     <div id="auth-container" class="container">
@@ -20,9 +21,11 @@
     <div id="app-container" style="display: none;">
         <div id="setup-screen" class="container" style="display: none;">
              <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
+             <p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন।</p>
             <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
             <input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
             <button id="save-initial-balance">সেভ করুন</button>
+            <button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান</button>
         </div>
 
         <div id="main-app" class="container" style="display: none;">
@@ -43,8 +46,7 @@
                 <h3 class="card-title">মোট বর্তমান ব্যালেন্স</h3>
                 <p id="total-balance">৳ 0.00</p>
             </div>
-
-            <!-- *** FIX: এই অংশটি আগে অনুপস্থিত ছিল *** -->
+            
             <div id="date-filter">
                 <label for="date-picker">দিন দেখুন:</label>
                 <input type="date" id="date-picker">
