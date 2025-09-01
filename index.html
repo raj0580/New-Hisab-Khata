@@ -3,90 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Tracker</title>
-    
-    <!-- PWA Manifest Link -->
+    <title>Hisab Khata Pro</title>
     <link rel="manifest" href="manifest.json">
-    
-    <!-- Theme Color for browsers -->
-    <meta name="theme-color" content="#5cb85c">
-
-    <!-- Stylesheet -->
+    <meta name="theme-color" content="#28a745">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="auth-container">
-        <h2>Login</h2>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button id="login-btn">Login</button>
-        <p>Don't have an account? <a href="#" id="signup-link">Sign up</a></p>
+    <div id="auth-container" class="container">
+        <h2>লগইন করুন</h2>
+        <input type="email" id="email" placeholder="ইমেইল">
+        <input type="password" id="password" placeholder="পাসওয়ার্ড">
+        <button id="login-btn">লগইন</button>
+        <p>অ্যাকাউন্ট নেই? <a href="#" id="signup-link">সাইন আপ করুন</a></p>
     </div>
 
     <div id="app-container" style="display: none;">
-        <div id="setup-screen">
-            <h2>Initial Balance Setup</h2>
-            <input type="number" id="initial-online-balance" placeholder="Initial Online Balance">
-            <input type="number" id="initial-cash-balance" placeholder="Initial Cash Balance">
-            <button id="save-initial-balance">Save</button>
+        <div id="setup-screen" class="container">
+            <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
+            <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
+            <input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
+            <button id="save-initial-balance">সেভ করুন</button>
         </div>
 
-        <div id="main-app" style="display: none;">
+        <div id="main-app" style="display: none;" class="container">
             <header>
-                <h1>Dashboard</h1>
-                <button id="logout-btn">Logout</button>
+                <h1>ড্যাশবোর্ড</h1>
+                <button id="logout-btn">লগ আউট</button>
             </header>
 
             <div id="dashboard">
-                <div class="balance-card">
-                    <h3>Online Balance</h3>
-                    <p id="online-balance">৳0</p>
-                </div>
-                <div class="balance-card">
-                    <h3>Cash Balance</h3>
-                    <p id="cash-balance">৳0</p>
-                </div>
-                <div class="balance-card">
-                    <h3>Total Balance</h3>
-                    <p id="total-balance">৳0</p>
-                </div>
-                <div class="summary-card">
-                    <h3>Today's Income</h3>
-                    <p id="today-income">৳0</p>
-                </div>
-                <div class="summary-card">
-                    <h3>Today's Expense</h3>
-                    <p id="today-expense">৳0</p>
-                </div>
+                <div class="card"><h3>অনলাইন ব্যালেন্স</h3><p id="online-balance">৳0</p></div>
+                <div class="card"><h3>ক্যাশ ব্যালেন্স</h3><p id="cash-balance">৳0</p></div>
+                <div class="card"><h3>মোট ব্যালেন্স</h3><p id="total-balance">৳0</p></div>
+                <div class="card"><h3>নির্বাচিত দিনের আয়</h3><p id="today-income">৳0</p></div>
+                <div class="card"><h3>নির্বাচিত দিনের ব্যয়</h3><p id="today-expense">৳0</p></div>
+            </div>
+
+            <div id="date-filter">
+                <label for="date-picker">দিন দেখুন:</label>
+                <input type="date" id="date-picker">
             </div>
 
             <div id="transaction-form">
-                <h2>Add Transaction</h2>
+                <h2>নতুন লেনদেন যোগ করুন</h2>
                 <select id="category">
-                    <option value="online-income">Online Income</option>
-                    <option value="cash-income">Cash Income</option>
-                    <option value="online-expense">Online Expense</option>
-                    <option value="cash-expense">Cash Expense</option>
-                    <option value="due">Due</option>
+                    <option value="online-income">অনলাইন আয়</option>
+                    <option value="cash-income">ক্যাশ আয়</option>
+                    <option value="online-expense">অনলাইন খরচ</option>
+                    <option value="cash-expense">ক্যাশ খরচ</option>
+                    <option value="due">ডিউ (বকেয়া)</option>
                 </select>
-                <input type="number" id="amount" placeholder="Amount (৳)">
-                <input type="text" id="description" placeholder="Description (Optional)">
-                <input type="text" id="customer-name" placeholder="Customer Name (for Due)" style="display: none;">
-                <button id="add-transaction-btn">Add Transaction</button>
+                <input type="number" id="amount" placeholder="টাকার পরিমাণ (৳)">
+                <input type="text" id="description" placeholder="বর্ণনা / আইটেম (যেমন: Charger, Headphone)">
+                <input type="text" id="customer-name" placeholder="কাস্টমারের নাম (ডিউ হলে)" style="display: none;">
+                <button id="add-transaction-btn">যোগ করুন</button>
             </div>
 
-            <div id="transactions-list">
-                <h2>Recent Transactions</h2>
-                <ul id="transactions"></ul>
+            <div class="tabs">
+                <button class="tab-link active" onclick="openTab(event, 'all-transactions')">সকল লেনদেন</button>
+                <button class="tab-link" onclick="openTab(event, 'due-transactions')">ডিউ তালিকা</button>
             </div>
 
-            <div id="due-list">
-                <h2>Due List</h2>
-                <ul id="dues"></ul>
+            <div id="all-transactions" class="tab-content active">
+                <ul id="transactions-list-ul"></ul>
+            </div>
+            <div id="due-transactions" class="tab-content">
+                <ul id="due-list-ul"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Due Details Modal -->
+    <div id="due-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-customer-name"></h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div id="modal-body">
+                <p><strong>মোট বকেয়া:</strong> <span id="modal-remaining-due"></span></p>
+                <h3>পেমেন্ট ইতিহাস</h3>
+                <ul id="modal-payment-history"></ul>
+                <h3>নতুন পেমেন্ট যোগ করুন</h3>
+                <input type="number" id="new-payment-amount" placeholder="পেমেন্টের পরিমাণ">
+                <button id="add-payment-btn">পেমেন্ট যোগ করুন</button>
             </div>
         </div>
     </div>
 
     <script type="module" src="app.js"></script>
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tab-link");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+    </script>
 </body>
 </html>
