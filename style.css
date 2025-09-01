@@ -100,6 +100,11 @@ body {
     color: white;
 }
 
+/* === Date Filter Styles === */
+#date-filter {
+    margin-top: 25px;
+}
+
 /* === Form Styles === */
 #transaction-form input,
 #transaction-form select {
@@ -121,6 +126,14 @@ body {
 #add-transaction-btn {
     background-color: var(--primary-blue);
     margin-top: 10px;
+}
+.secondary-btn {
+    background-color: #f1f1f1;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+.secondary-btn:hover {
+    background-color: #e2e2e2;
 }
 
 /* === Tab Styles === */
@@ -148,7 +161,6 @@ body {
     color: var(--primary-blue);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
-
 .tab-content { display: none; margin-top: 20px; }
 .tab-content.active { display: block; }
 
@@ -162,6 +174,10 @@ li {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+.delete-btn {
+    background: none; border: none; color: var(--accent-red); cursor: pointer;
+    width: auto; padding: 5px; font-size: 18px; margin: 0;
 }
 
 /* === Modal Styles === */
@@ -177,6 +193,7 @@ li {
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;
 }
+.close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
 #modal-payment-history {
     max-height: 150px; overflow-y: auto;
     border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;
