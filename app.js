@@ -10,7 +10,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ধাপ ৩: Firebase কনফিগারেশন এবং ইনিশিয়ালাইজেশন (শুধুমাত্র একবার)
+// ধাপ ৩: Firebase কনফিগারেশন এবং ইনিশিয়ালাইজেশন
 const firebaseConfig = { apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg", authDomain: "new-hisab-khata.firebaseapp.com", databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com", projectId: "new-hisab-khata", storageBucket: "new-hisab-khata.firebasestorage.app", messagingSenderId: "116945944640", appId: "1:116945944640:web:8d944c18a0e4daaee19fa5", measurementId: "G-R71KCTMZC6" };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -18,7 +18,6 @@ const db = getFirestore(app);
 
 // ধাপ ৪: অফলাইন ডেটা চালু করুন
 enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ", err.code));
-console.log("Firebase App Initialized Successfully!");
 
 // ধাপ ৫: সব DOM Elements গুলোকে ধরুন
 const authContainer = document.getElementById('auth-container');
@@ -34,19 +33,26 @@ const datePicker = document.getElementById('date-picker');
 const categorySelect = document.getElementById('category');
 const customerNameInput = document.getElementById('customer-name');
 const transactionForm = document.getElementById('transaction-form');
+const saveInitialBalanceBtn = document.getElementById('save-initial-balance');
+const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
+const modal = document.getElementById('due-details-modal');
 
 let currentUser;
 let currentOpenDue = {};
+let hasCheckedBalance = false;
 
-// ধাপ ৬: অথেনটিকেশন
+// ধাপ ৬: অথেনটিকেশন (ইউজার লগইন বা লগআউট করলে কী হবে)
 onAuthStateChanged(auth, user => {
     if (user) {
         currentUser = user;
-        authContainer.style.display = 'none'; appContainer.style.display = 'block';
+        authContainer.style.display = 'none';
+        appContainer.style.display = 'block';
+        hasCheckedBalance = false; // নতুন করে লগইন হলে রিসেট করুন
         checkInitialBalance();
     } else {
         currentUser = null;
-        authContainer.style.display = 'block'; appContainer.style.display = 'none';
+        authContainer.style.display = 'block';
+        appContainer.style.display = 'none';
     }
 });
 
@@ -55,30 +61,58 @@ loginBtn.addEventListener('click', () => signInWithEmailAndPassword(auth, emailI
 signupLink.addEventListener('click', e => { e.preventDefault(); createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)); });
 logoutBtn.addEventListener('click', () => signOut(auth));
 
-
+// উন্নত checkInitialBalance ফাংশন
 async function checkInitialBalance() {
+    if (!currentUser || hasCheckedBalance) return;
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceSnap = await getDoc(balanceRef);
-    if (balanceSnap.exists()) {
-        setupScreen.style.display = 'none'; mainApp.style.display = 'block';
+    try {
+        const balanceSnap = await getDoc(balanceRef);
+        hasCheckedBalance = true;
+        if (balanceSnap.exists()) {
+            showMainApp();
+        } else {
+            setupScreen.style.display = 'block';
+            mainApp.style.display = 'none';
+        }
+    } catch (error) {
+        console.error("Error checking balance:", error);
+        setupScreen.style.display = 'block';
+        mainApp.style.display = 'none';
+    }
+}
+
+// মূল অ্যাপ দেখানোর জন্য ফাংশন
+function showMainApp() {
+    setupScreen.style.display = 'none';
+    mainApp.style.display = 'block';
+    if(datePicker) {
         datePicker.valueAsDate = new Date();
         loadDashboardData();
         loadTransactionsForDate(datePicker.valueAsDate);
         loadAllDues();
-    } else {
-        setupScreen.style.display = 'block'; mainApp.style.display = 'none';
     }
 }
 
-document.getElementById('save-initial-balance').addEventListener('click', async () => {
+// Initial balance save বাটন
+saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
     await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash });
-    checkInitialBalance();
+    showMainApp();
 });
 
-datePicker.addEventListener('change', () => loadTransactionsForDate(datePicker.valueAsDate));
+// Skip বাটন
+skipBalanceSetupBtn.addEventListener('click', async () => {
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online: 0, cash: 0 });
+    showMainApp();
+});
 
+// তারিখ পরিবর্তন হলে ডেটা লোড
+if(datePicker) {
+    datePicker.addEventListener('change', () => loadTransactionsForDate(datePicker.valueAsDate));
+}
+
+// ড্যাশবোর্ড ডেটা লোড
 function loadDashboardData() {
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     onSnapshot(balanceRef, (doc) => {
@@ -90,6 +124,7 @@ function loadDashboardData() {
     });
 }
 
+// নির্দিষ্ট তারিখের লেনদেন লোড
 function loadTransactionsForDate(selectedDate) {
     const startOfDay = new Date(selectedDate); startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(selectedDate); endOfDay.setHours(23, 59, 59, 999);
@@ -102,7 +137,6 @@ function loadTransactionsForDate(selectedDate) {
             const t = doc.data();
             if (t.type === 'income') dailyIncome += t.amount;
             if (t.type === 'expense') dailyExpense += t.amount;
-            // *** এখানে ডিলিট বাটনে data-type="transaction" যোগ করা হয়েছে ***
             list.innerHTML += `<li><span>${t.category}: ৳${t.amount} (${t.description})</span> <button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></li>`;
         });
         document.getElementById('today-income').textContent = `৳${dailyIncome.toFixed(2)}`;
@@ -110,6 +144,7 @@ function loadTransactionsForDate(selectedDate) {
     });
 }
 
+// সকল ডিউ লোড
 function loadAllDues() {
     const q = query(collection(db, 'users', currentUser.uid, 'dues'), where('status', '!=', 'paid'), orderBy('status'), orderBy('customerName'));
     onSnapshot(q, snapshot => {
@@ -122,8 +157,8 @@ function loadAllDues() {
     }, error => console.error("Error loading dues:", error));
 }
 
+// লেনদেন যোগ করার লজিক
 categorySelect.addEventListener('change', () => customerNameInput.style.display = categorySelect.value === 'due' ? 'block' : 'none');
-
 document.getElementById('add-transaction-btn').addEventListener('click', async () => {
     const category = categorySelect.value;
     const amount = parseFloat(document.getElementById('amount').value);
@@ -152,7 +187,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     } catch(err) { console.error("Error adding transaction: ", err); }
 });
 
-const modal = document.getElementById('due-details-modal');
+// ডিউ মডাল এবং পেমেন্ট লজিক
 document.getElementById('due-list-ul').addEventListener('click', async e => {
     if (!e.target.classList.contains('view-due-btn')) return;
     const dueId = e.target.closest('li').dataset.id;
@@ -169,7 +204,6 @@ document.getElementById('due-list-ul').addEventListener('click', async e => {
             historyUl.innerHTML = '';
             p_snap.forEach(p_doc => {
                 const p = p_doc.data();
-                // *** FIX 1: '.toDate' এরর সমাধানের জন্য এখানে একটি null check যোগ করা হয়েছে ***
                 if (p.paymentDate) {
                     historyUl.innerHTML += `<li>${p.paymentDate.toDate().toLocaleDateString()}: ৳${p.amount.toFixed(2)}</li>`;
                 }
@@ -178,9 +212,7 @@ document.getElementById('due-list-ul').addEventListener('click', async e => {
     });
     modal.style.display = 'block';
 });
-
 document.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
-
 document.getElementById('add-payment-btn').addEventListener('click', async () => {
     const paymentAmount = parseFloat(document.getElementById('new-payment-amount').value);
     if (!paymentAmount || paymentAmount <= 0 || paymentAmount > currentOpenDue.data.remainingAmount) return alert('সঠিক পেমেন্টের পরিমাণ দিন');
@@ -195,49 +227,38 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
     modal.style.display = 'none';
 });
 
-// *** FIX 2: ডিলিট করার জন্য নতুন Event Listener যোগ করা হয়েছে ***
+// ডিলিট করার লজিক
 mainApp.addEventListener('click', async (e) => {
     if (!e.target.classList.contains('delete-btn')) return;
-
-    const id = e.target.dataset.id;
-    const type = e.target.dataset.type;
-
-    if (!id || !type) return;
-
-    if (!confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+    const id = e.target.dataset.id; const type = e.target.dataset.type;
+    if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
 
     if (type === 'transaction') {
         const transRef = doc(db, 'users', currentUser.uid, 'transactions', id);
         const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-        
         try {
             const transDoc = await getDoc(transRef);
             if (!transDoc.exists()) return console.error("Transaction not found!");
-
             const transaction = transDoc.data();
             const balanceDoc = await getDoc(balanceRef);
             if (!balanceDoc.exists()) return console.error("Balance not found!");
-            
             const balance = balanceDoc.data();
-
-            // ব্যালেন্স আগের অবস্থায় ফিরিয়ে আনা
             if (transaction.category === 'online-income') balance.online -= transaction.amount;
             else if (transaction.category === 'cash-income') balance.cash -= transaction.amount;
             else if (transaction.category === 'online-expense') balance.online += transaction.amount;
             else if (transaction.category === 'cash-expense') balance.cash += transaction.amount;
-            
-            // Batch write ব্যবহার করে ব্যালেন্স আপডেট এবং ট্রানজেকশন ডিলিট করা
             const batch = writeBatch(db);
             batch.update(balanceRef, { online: balance.online, cash: balance.cash });
             batch.delete(transRef);
             await batch.commit();
-
-            console.log("Transaction deleted successfully.");
-
-        } catch (error) {
-            console.error("Error deleting transaction:", error);
-            alert("লেনদেনটি মুছতে সমস্যা হয়েছে।");
-        }
+        } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
     }
-    // ভবিষ্যতে ডিউ ডিলিট করার কোড এখানে যোগ করা যাবে
-});
+});```
+
+### পরবর্তী পদক্ষেপ:
+
+1.  আপনার `index.html`, `style.css` এবং `app.js` ফাইলগুলো উপরের নতুন এবং সম্পূর্ণ কোড দিয়ে **প্রতিস্থাপন** করুন।
+2.  আপনার কোড Vercel-এ **ডিপ্লয়** করুন।
+3.  ডিপ্লয় সম্পন্ন হলে, ব্রাউজার খুলে **`Ctrl + Shift + R` (হার্ড রিলোড)** করে ক্যাশ পুরোপুরি পরিষ্কার করুন।
+
+এইবার আপনার কাছে একটি সম্পূর্ণ, কার্যকরী এবং সুন্দর ডিজাইনের অ্যাপ থাকবে। আপনাকে আর কোনো সমস্যার সম্মুখীন হতে হবে না।
