@@ -1,25 +1,53 @@
 // Firebase SDK-এর মডিউলগুলো সরাসরি CDN থেকে ইম্পোর্ট করুন
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enablePersistence } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+// Step 1: Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+  });
+}
 
 // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
-    authDomain: "new-hisab-khata.firebaseapp.com",
-    databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
-    projectId: "new-hisab-khata",
-    storageBucket: "new-hisab-khata.firebasestorage.app",
-    messagingSenderId: "116945944640",
-    appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
-    measurementId: "G-R71KCTMZC6"
-  };
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
+  authDomain: "new-hisab-khata.firebaseapp.com",
+  databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
+  projectId: "new-hisab-khata",
+  storageBucket: "new-hisab-khata.firebasestorage.app",
+  messagingSenderId: "116945944640",
+  appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
+  measurementId: "G-R71KCTMZC6"
+};
 
 // Firebase ইনিশিয়ালাইজ করুন
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Step 2: Firestore Offline Persistence চালু করুন
+enablePersistence(db)
+  .catch(err => {
+    if (err.code == 'failed-precondition') {
+      // একাধিক ট্যাব খোলা থাকলে এই সমস্যা হতে পারে
+      console.log('Persistence failed, probably multiple tabs open');
+    } else if (err.code == 'unimplemented') {
+      // ব্রাউজার সাপোর্ট না করলে
+      console.log('Persistence is not available in this browser');
+    }
+  });
+
+
+// --- বাকি সমস্ত JavaScript কোড অপরিবর্তিত থাকবে ---
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container');
@@ -31,23 +59,19 @@ const signupLink = document.getElementById('signup-link');
 const logoutBtn = document.getElementById('logout-btn');
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
-
 const initialOnlineBalanceInput = document.getElementById('initial-online-balance');
 const initialCashBalanceInput = document.getElementById('initial-cash-balance');
 const saveInitialBalanceBtn = document.getElementById('save-initial-balance');
-
 const onlineBalanceEl = document.getElementById('online-balance');
 const cashBalanceEl = document.getElementById('cash-balance');
 const totalBalanceEl = document.getElementById('total-balance');
 const todayIncomeEl = document.getElementById('today-income');
 const todayExpenseEl = document.getElementById('today-expense');
-
 const categorySelect = document.getElementById('category');
 const amountInput = document.getElementById('amount');
 const descriptionInput = document.getElementById('description');
 const customerNameInput = document.getElementById('customer-name');
 const addTransactionBtn = document.getElementById('add-transaction-btn');
-
 const transactionsUl = document.getElementById('transactions');
 const duesUl = document.getElementById('dues');
 
@@ -200,7 +224,6 @@ addTransactionBtn.addEventListener('click', async () => {
     try {
         await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), transactionData);
 
-        // Update balance only if it's not a 'due' transaction
         if (category !== 'due') {
             const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
             const balanceDoc = await getDoc(balanceDocRef);
@@ -217,7 +240,6 @@ addTransactionBtn.addEventListener('click', async () => {
             }
         }
 
-        // Clear form
         amountInput.value = '';
         descriptionInput.value = '';
         customerNameInput.value = '';
@@ -270,7 +292,6 @@ appContainer.addEventListener('click', async (e) => {
             if (transactionDoc.exists()) {
                 const transaction = transactionDoc.data();
                 
-                // Revert balance change if it's not a due transaction
                 if (transaction.category !== 'due') {
                     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
                     const balanceDoc = await getDoc(balanceDocRef);
