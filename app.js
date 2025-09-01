@@ -16,7 +16,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// আপনার দেওয়া Firebase কনফিগারেশন
+// আপনার Firebase কনফিগারেশন (শুধুমাত্র এই একটি জায়গায় থাকবে)
 const firebaseConfig = {
     apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
     authDomain: "new-hisab-khata.firebaseapp.com",
@@ -28,7 +28,7 @@ const firebaseConfig = {
     measurementId: "G-R71KCTMZC6"
 };
 
-// Firebase ইনিশিয়ালাইজ করুন
+// Firebase ইনিশিয়ালাইজ করুন (শুধুমাত্র একবার)
 const app = initializeApp(firebaseConfig);
 
 // এখন Auth এবং Firestore সার্ভিস ইনিশিয়ালাইজ করুন
@@ -45,10 +45,8 @@ enableIndexedDbPersistence(db)
     }
   });
 
+// --- বাকি সমস্ত JavaScript কোড ---
 
-// --- বাকি সমস্ত JavaScript কোড অপরিবর্তিত থাকবে ---
-
-// DOM Elements
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
 const setupScreen = document.getElementById('setup-screen');
@@ -73,10 +71,7 @@ const customerNameInput = document.getElementById('customer-name');
 const addTransactionBtn = document.getElementById('add-transaction-btn');
 const transactionsUl = document.getElementById('transactions');
 const duesUl = document.getElementById('dues');
-
 let currentUser;
-
-// Auth State Change Listener
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -91,35 +86,26 @@ onAuthStateChanged(auth, (user) => {
         setupScreen.style.display = 'none';
     }
 });
-
-// Login and Signup
 loginBtn.addEventListener('click', () => {
     const email = emailInput.value;
     const password = passwordInput.value;
-    signInWithEmailAndPassword(auth, email, password)
-        .catch(error => {
-            console.error("Login Error:", error);
-            alert(`Login Failed: ${error.message}`);
-        });
+    signInWithEmailAndPassword(auth, email, password).catch(error => {
+        console.error("Login Error:", error);
+        alert(`Login Failed: ${error.message}`);
+    });
 });
-
 signupLink.addEventListener('click', (e) => {
     e.preventDefault();
     const email = emailInput.value;
     const password = passwordInput.value;
-    createUserWithEmailAndPassword(auth, email, password)
-        .catch(error => {
-            console.error("Signup Error:", error);
-            alert(`Signup Failed: ${error.message}`);
-        });
+    createUserWithEmailAndPassword(auth, email, password).catch(error => {
+        console.error("Signup Error:", error);
+        alert(`Signup Failed: ${error.message}`);
+    });
 });
-
-// Logout
 logoutBtn.addEventListener('click', () => {
     signOut(auth);
 });
-
-// Check for initial balance
 async function checkInitialBalance() {
     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     const balanceDoc = await getDoc(balanceDocRef);
@@ -133,26 +119,22 @@ async function checkInitialBalance() {
         mainApp.style.display = 'none';
     }
 }
-
-// Save initial balance
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(initialOnlineBalanceInput.value) || 0;
     const cash = parseFloat(initialCashBalanceInput.value) || 0;
-
     if (isNaN(online) || isNaN(cash)) {
         return alert("Please enter valid numbers for balance.");
     }
-
     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    await setDoc(balanceDocRef, { online, cash });
-
+    await setDoc(balanceDocRef, {
+        online,
+        cash
+    });
     setupScreen.style.display = 'none';
     mainApp.style.display = 'block';
     loadDashboardData();
     loadTransactions();
 });
-
-// Load dashboard data
 function loadDashboardData() {
     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     onSnapshot(balanceDocRef, (doc) => {
@@ -163,10 +145,8 @@ function loadDashboardData() {
             totalBalanceEl.textContent = `৳${(data.online + data.cash).toFixed(2)}`;
         }
     });
-
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-
     const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'), where('timestamp', '>=', todayStart));
     onSnapshot(transactionsQuery, (snapshot) => {
         let income = 0;
@@ -183,30 +163,23 @@ function loadDashboardData() {
         todayExpenseEl.textContent = `৳${expense.toFixed(2)}`;
     });
 }
-
-// Category change handler
 categorySelect.addEventListener('change', () => {
     customerNameInput.style.display = categorySelect.value === 'due' ? 'block' : 'none';
 });
-
-// Add transaction
 addTransactionBtn.addEventListener('click', async () => {
     const category = categorySelect.value;
     const amount = parseFloat(amountInput.value);
     const description = descriptionInput.value;
     const customerName = customerNameInput.value;
-
     if (!amount || amount <= 0) {
         return alert('Please enter a valid amount.');
     }
-
     const transactionData = {
         category,
         amount,
         description,
         timestamp: serverTimestamp()
     };
-
     if (category === 'due') {
         if (!customerName) {
             return alert('Please enter a customer name for due.');
@@ -219,38 +192,36 @@ addTransactionBtn.addEventListener('click', async () => {
     } else if (category.includes('expense')) {
         transactionData.type = 'expense';
     }
-    
     try {
         await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), transactionData);
-
         if (category !== 'due') {
             const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
             const balanceDoc = await getDoc(balanceDocRef);
             if (balanceDoc.exists()) {
                 const currentBalance = balanceDoc.data();
-                let { online: newOnline, cash: newCash } = currentBalance;
-
+                let {
+                    online: newOnline,
+                    cash: newCash
+                } = currentBalance;
                 if (category === 'online-income') newOnline += amount;
                 if (category === 'cash-income') newCash += amount;
                 if (category === 'online-expense') newOnline -= amount;
                 if (category === 'cash-expense') newCash -= amount;
-
-                await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+                await updateDoc(balanceDocRef, {
+                    online: newOnline,
+                    cash: newCash
+                });
             }
         }
-
         amountInput.value = '';
         descriptionInput.value = '';
         customerNameInput.value = '';
         customerNameInput.style.display = 'none';
-
     } catch (error) {
         console.error("Transaction Error:", error);
         alert(`Failed to add transaction: ${error.message}`);
     }
 });
-
-// Load transactions and dues
 function loadTransactions() {
     const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'));
     onSnapshot(transactionsQuery, (snapshot) => {
@@ -259,16 +230,13 @@ function loadTransactions() {
         snapshot.forEach(doc => {
             const transaction = doc.data();
             const li = document.createElement('li');
-            
             let details = `${transaction.category}: ৳${transaction.amount}`;
             if (transaction.customerName) details += ` - ${transaction.customerName}`;
             if (transaction.description) details += ` (${transaction.description})`;
-
             li.innerHTML = `
                 <span>${details}</span>
                 <button class="delete-btn" data-id="${doc.id}">Delete</button>
             `;
-
             if (transaction.category === 'due') {
                 duesUl.appendChild(li);
             } else {
@@ -277,33 +245,32 @@ function loadTransactions() {
         });
     });
 }
-
-// Delete transaction
 appContainer.addEventListener('click', async (e) => {
     if (e.target.classList.contains('delete-btn')) {
         if (!confirm("Are you sure you want to delete this transaction?")) return;
-
         const id = e.target.dataset.id;
         const transactionDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
-        
         try {
             const transactionDoc = await getDoc(transactionDocRef);
             if (transactionDoc.exists()) {
                 const transaction = transactionDoc.data();
-                
                 if (transaction.category !== 'due') {
                     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
                     const balanceDoc = await getDoc(balanceDocRef);
                     if (balanceDoc.exists()) {
                         const currentBalance = balanceDoc.data();
-                        let { online: newOnline, cash: newCash } = currentBalance;
-
+                        let {
+                            online: newOnline,
+                            cash: newCash
+                        } = currentBalance;
                         if (transaction.category === 'online-income') newOnline -= transaction.amount;
                         if (transaction.category === 'cash-income') newCash -= transaction.amount;
                         if (transaction.category === 'online-expense') newOnline += transaction.amount;
                         if (transaction.category === 'cash-expense') newCash += transaction.amount;
-
-                        await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+                        await updateDoc(balanceDocRef, {
+                            online: newOnline,
+                            cash: newCash
+                        });
                     }
                 }
             }
