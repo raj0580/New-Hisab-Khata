@@ -1,48 +1,88 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ডিজিটাল হিসাব খাতা</title>
+    <title>Finance Tracker</title>
     <link rel="stylesheet" href="style.css">
-    <meta name="theme-color" content="#4338ca">
 </head>
 <body>
-
-    <div id="app-container">
-        <header id="app-header">
-            <h1 id="app-title">ড্যাশবোর্ড</h1>
-            <button id="logout-btn" style="display: none;">&#10162;</button>
-        </header>
-
-        <main id="app-main-content">
-            <div class="loader-container"><div class="loader"></div></div>
-        </main>
-
-        <nav id="bottom-nav" style="display: none;">
-            <button class="nav-item active" data-page="dashboard" data-title="ড্যাশবোর্ড">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="nav-icon"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zM13 4v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
-                <span>ড্যাশবোর্ড</span>
-            </button>
-            <button class="nav-item" data-page="dueManager" data-title="বাকি খাতা">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="nav-icon"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                <span>বাকি খাতা</span>
-            </button>
-            <button class="nav-item add-button" data-action="add-transaction">
-                +
-            </button>
-            <button class="nav-item" data-page="transactions" data-title="সব লেনদেন">
-                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="nav-icon"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
-                <span>তালিকা</span>
-            </button>
-        </nav>
+    <div id="auth-container">
+        <h2>Login</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="login-btn">Login</button>
+        <p>Don't have an account? <a href="#" id="signup-link">Sign up</a></p>
     </div>
 
-    <div id="modal-container" class="modal-overlay"></div>
-    
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <div id="app-container" style="display: none;">
+        <div id="setup-screen">
+            <h2>Initial Balance Setup</h2>
+            <input type="number" id="initial-online-balance" placeholder="Initial Online Balance">
+            <input type="number" id="initial-cash-balance" placeholder="Initial Cash Balance">
+            <button id="save-initial-balance">Save</button>
+        </div>
+
+        <div id="main-app" style="display: none;">
+            <header>
+                <h1>Dashboard</h1>
+                <button id="logout-btn">Logout</button>
+            </header>
+
+            <div id="dashboard">
+                <div class="balance-card">
+                    <h3>Online Balance</h3>
+                    <p id="online-balance">৳0</p>
+                </div>
+                <div class="balance-card">
+                    <h3>Cash Balance</h3>
+                    <p id="cash-balance">৳0</p>
+                </div>
+                <div class="balance-card">
+                    <h3>Total Balance</h3>
+                    <p id="total-balance">৳0</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Today's Income</h3>
+                    <p id="today-income">৳0</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Today's Expense</h3>
+                    <p id="today-expense">৳0</p>
+                </div>
+            </div>
+
+            <div id="transaction-form">
+                <h2>Add Transaction</h2>
+                <select id="category">
+                    <option value="online-income">Online Income</option>
+                    <option value="cash-income">Cash Income</option>
+                    <option value="online-expense">Online Expense</option>
+                    <option value="cash-expense">Cash Expense</option>
+                    <option value="due">Due</option>
+                </select>
+                <input type="number" id="amount" placeholder="Amount (৳)">
+                <input type="text" id="description" placeholder="Description (Optional)">
+                <input type="text" id="customer-name" placeholder="Customer Name (for Due)" style="display: none;">
+                <button id="add-transaction-btn">Add Transaction</button>
+            </div>
+
+            <div id="transactions-list">
+                <h2>Recent Transactions</h2>
+                <ul id="transactions"></ul>
+            </div>
+
+            <div id="due-list">
+                <h2>Due List</h2>
+                <ul id="dues"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
