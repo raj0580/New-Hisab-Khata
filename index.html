@@ -43,6 +43,12 @@
                 <h3 class="card-title">মোট বর্তমান ব্যালেন্স</h3>
                 <p id="total-balance">৳ 0.00</p>
             </div>
+
+            <!-- *** FIX: এই অংশটি আগে অনুপস্থিত ছিল *** -->
+            <div id="date-filter">
+                <label for="date-picker">দিন দেখুন:</label>
+                <input type="date" id="date-picker">
+            </div>
             
             <h2 class="section-title">নতুন লেনদেন যোগ করুন</h2>
             <form id="transaction-form">
@@ -66,7 +72,6 @@
         </div>
     </div>
     
-    <!-- Modal remains unchanged but will inherit new styles -->
     <div id="due-details-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h2 id="modal-customer-name"></h2><span class="close-btn">&times;</span></div>
