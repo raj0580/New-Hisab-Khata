@@ -1,11 +1,9 @@
-// Firebase SDK-এর মডিউলগুলো সরাসরি CDN থেকে ইম্পোর্ট করুন
+// প্রয়োজনীয় সব ফাংশন সঠিক ভার্সন থেকে ইম্পোর্ট করুন
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-// এখানে enablePersistence এর পরিবর্তে enableIndexedDbPersistence ইম্পোর্ট করা হয়েছে
-import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-// Register Service Worker
+// Service Worker রেজিস্টার করুন
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -18,9 +16,8 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
+// আপনার দেওয়া Firebase কনফিগারেশন
+const firebaseConfig = {
     apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
     authDomain: "new-hisab-khata.firebaseapp.com",
     databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
@@ -29,16 +26,16 @@ if ('serviceWorker' in navigator) {
     messagingSenderId: "116945944640",
     appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
     measurementId: "G-R71KCTMZC6"
-  };
-
+};
 
 // Firebase ইনিশিয়ালাইজ করুন
 const app = initializeApp(firebaseConfig);
+
+// এখন Auth এবং Firestore সার্ভিস ইনিশিয়ালাইজ করুন
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Firestore Offline Persistence চালু করুন
-// এখানে ফাংশনের নাম পরিবর্তন করা হয়েছে
 enableIndexedDbPersistence(db)
   .catch(err => {
     if (err.code == 'failed-precondition') {
