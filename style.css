@@ -1,81 +1,162 @@
+/* === Google Font Import === */
 @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
 
+/* === Root Variables (for easy color changes) === */
 :root {
-    --primary-color: #28a745; --primary-hover: #218838; --danger-color: #dc3545;
-    --info-color: #17a2b8; --light-gray: #f8f9fa; --dark-gray: #343a40;
-    --text-color: #495057; --border-color: #dee2e6;
+    --primary-color: #28a745;
+    --primary-hover: #218838;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --light-gray: #f8f9fa;
+    --dark-gray: #343a40;
+    --text-color: #495057;
+    --border-color: #dee2e6;
+    --body-bg: #eef2f5; /* A slightly darker background */
 }
 
+/* === General Body and Container Styles === */
 body {
-    font-family: 'Hind Siliguri', sans-serif; background-color: var(--light-gray);
-    color: var(--text-color); margin: 0; padding: 15px;
+    font-family: 'Hind Siliguri', sans-serif;
+    background-color: var(--body-bg);
+    color: var(--text-color);
+    margin: 0;
+    padding: 10px; /* Reduced padding for mobile */
 }
 
 .container {
-    max-width: 900px; margin: auto; background: #fff; padding: 25px;
-    border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    max-width: 900px;
+    margin: auto;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
 }
 
-#auth-container { margin-top: 50px; }
+#auth-container {
+    margin-top: 30px;
+}
 
+/* === Forms: Input, Select, Button === */
 input, select, button {
-    width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px;
-    border: 1px solid var(--border-color); font-size: 16px; box-sizing: border-box;
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 16px;
+    box-sizing: border-box;
+    -webkit-appearance: none; /* Removes default iOS styling */
 }
 
 button {
-    background: var(--primary-color); color: #fff; border: none;
-    cursor: pointer; font-weight: 600; transition: background-color 0.3s ease;
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
 }
 button:hover { background: var(--primary-hover); }
 
+/* === Header === */
 header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
 }
-header h1 { color: var(--dark-gray); margin: 0; }
+header h1 {
+    color: var(--dark-gray);
+    margin: 0;
+    font-size: 24px; /* Slightly smaller on mobile */
+}
 
 #logout-btn { background: var(--danger-color); width: auto; }
 
+/* === Dashboard Cards (Mobile First) === */
 #dashboard {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px; margin-bottom: 25px;
+    display: grid;
+    /* On mobile, 2 columns. On larger screens, it will expand */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 25px;
 }
 
 .card {
-    background: var(--light-gray); padding: 15px; border-radius: 8px;
-    text-align: center; border: 1px solid #e9ecef;
+    background: var(--light-gray);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
 }
-.card h3 { margin: 0 0 10px 0; font-size: 14px; color: #6c757d; font-weight: 500; }
-.card p { margin: 0; font-size: 22px; font-weight: 700; color: var(--dark-gray); }
+.card h3 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #6c757d;
+    font-weight: 500;
+}
+.card p {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--dark-gray);
+}
 
+/* === Filters and Tabs === */
 #date-filter {
-    display: flex; gap: 10px; align-items: center; margin-bottom: 20px;
-    background: var(--light-gray); padding: 10px; border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--light-gray);
+    padding: 10px;
+    border-radius: 8px;
 }
 #date-picker { width: auto; flex-grow: 1; }
 #date-filter label { font-weight: 600; white-space: nowrap; }
 
 .tabs {
-    display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px;
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 20px;
 }
 .tab-link {
-    padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px;
-    font-weight: 600; color: #6c757d; position: relative; margin-bottom: -2px;
+    flex: 1; /* Tabs will take equal space */
+    text-align: center;
+    padding: 12px 5px; /* Adjusted padding */
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 15px;
+    font-weight: 600;
+    color: #6c757d;
+    position: relative;
+    margin-bottom: -2px;
 }
 .tab-link.active { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); }
 
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
+/* === Lists === */
 ul { list-style: none; padding: 0; }
 li {
-    background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px;
-    border: 1px solid var(--border-color); display: flex;
-    justify-content: space-between; align-items: center;
-    transition: box-shadow 0.2s ease;
+    background: #fff;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allow items to wrap on small screens */
+    gap: 10px;
 }
-li:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+li span {
+    flex-grow: 1;
+}
 .delete-btn {
     background: none; border: none; color: var(--danger-color); cursor: pointer;
     width: auto; padding: 5px; font-size: 18px;
@@ -85,20 +166,70 @@ li:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     font-size: 14px; width: auto;
 }
 
-/* Modal Styles */
+/* === Modal Styles (Mobile Responsive) === */
 .modal {
     display: none; position: fixed; z-index: 1000; left: 0; top: 0;
     width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+    padding-top: 60px; /* Space from top */
 }
 .modal-content {
-    background-color: #fefefe; margin: 10% auto; padding: 25px; border: 1px solid #888;
-    width: 90%; max-width: 500px; border-radius: 12px; animation: slideIn 0.3s;
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 90%; /* Responsive width */
+    max-width: 500px;
+    border-radius: 12px;
+    animation: slideIn 0.3s;
 }
 @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
 .modal-header {
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px;
 }
 .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
 
-#modal-payment-history li { font-size: 14px; padding: 10px; }
+#modal-payment-history {
+    max-height: 150px; /* Make history scrollable if it's too long */
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+#modal-payment-history li { font-size: 14px; padding: 8px; border-bottom: 1px solid var(--border-color); }
+#modal-payment-history li:last-child { border-bottom: none; }
+
+
+/* =========================================== */
+/* === MEDIA QUERIES for LARGER SCREENS === */
+/* =========================================== */
+
+/* For tablets and larger screens (e.g., screen width is 768px or more) */
+@media (min-width: 768px) {
+    body {
+        padding: 20px; /* Restore padding for larger screens */
+    }
+
+    .container {
+        padding: 30px;
+    }
+
+    header h1 {
+        font-size: 28px; /* Make title larger */
+    }
+
+    #dashboard {
+        /* On large screens, let it create as many columns as fit, but at least 150px wide */
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    .card p {
+        font-size: 24px;
+    }
+
+    .tab-link {
+        flex: 0 1 auto; /* Tabs will take their own width */
+    }
+}
