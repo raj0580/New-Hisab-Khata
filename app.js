@@ -1,19 +1,20 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+// Firebase SDK-এর মডিউলগুলো সরাসরি CDN থেকে ইম্পোর্ট করুন
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
-  authDomain: "new-hisab-khata.firebaseapp.com",
-  databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
-  projectId: "new-hisab-khata",
-  storageBucket: "new-hisab-khata.firebasestorage.app",
-  messagingSenderId: "116945944640",
-  appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
-  measurementId: "G-R71KCTMZC6"
-};
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyCESxz9Tyc0GvcY5PfWcPda0kArYb_6Jvg",
+    authDomain: "new-hisab-khata.firebaseapp.com",
+    databaseURL: "https://new-hisab-khata-default-rtdb.firebaseio.com",
+    projectId: "new-hisab-khata",
+    storageBucket: "new-hisab-khata.firebasestorage.app",
+    messagingSenderId: "116945944640",
+    appId: "1:116945944640:web:8d944c18a0e4daaee19fa5",
+    measurementId: "G-R71KCTMZC6"
+  };
 
 // Firebase ইনিশিয়ালাইজ করুন
 const app = initializeApp(firebaseConfig);
@@ -59,12 +60,12 @@ onAuthStateChanged(auth, (user) => {
         authContainer.style.display = 'none';
         appContainer.style.display = 'block';
         checkInitialBalance();
-        loadDashboardData();
-        loadTransactions();
     } else {
         currentUser = null;
         authContainer.style.display = 'block';
         appContainer.style.display = 'none';
+        mainApp.style.display = 'none';
+        setupScreen.style.display = 'none';
     }
 });
 
@@ -72,14 +73,22 @@ onAuthStateChanged(auth, (user) => {
 loginBtn.addEventListener('click', () => {
     const email = emailInput.value;
     const password = passwordInput.value;
-    signInWithEmailAndPassword(auth, email, password).catch(error => alert(error.message));
+    signInWithEmailAndPassword(auth, email, password)
+        .catch(error => {
+            console.error("Login Error:", error);
+            alert(`Login Failed: ${error.message}`);
+        });
 });
 
 signupLink.addEventListener('click', (e) => {
     e.preventDefault();
     const email = emailInput.value;
     const password = passwordInput.value;
-    createUserWithEmailAndPassword(auth, email, password).catch(error => alert(error.message));
+    createUserWithEmailAndPassword(auth, email, password)
+        .catch(error => {
+            console.error("Signup Error:", error);
+            alert(`Signup Failed: ${error.message}`);
+        });
 });
 
 // Logout
@@ -94,6 +103,8 @@ async function checkInitialBalance() {
     if (balanceDoc.exists()) {
         setupScreen.style.display = 'none';
         mainApp.style.display = 'block';
+        loadDashboardData();
+        loadTransactions();
     } else {
         setupScreen.style.display = 'block';
         mainApp.style.display = 'none';
@@ -105,12 +116,17 @@ saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(initialOnlineBalanceInput.value) || 0;
     const cash = parseFloat(initialCashBalanceInput.value) || 0;
 
+    if (isNaN(online) || isNaN(cash)) {
+        return alert("Please enter valid numbers for balance.");
+    }
+
     const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     await setDoc(balanceDocRef, { online, cash });
 
     setupScreen.style.display = 'none';
     mainApp.style.display = 'block';
     loadDashboardData();
+    loadTransactions();
 });
 
 // Load dashboard data
@@ -125,10 +141,10 @@ function loadDashboardData() {
         }
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-    const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'), where('timestamp', '>=', today));
+    const transactionsQuery = query(collection(db, 'users', currentUser.uid, 'transactions'), where('timestamp', '>=', todayStart));
     onSnapshot(transactionsQuery, (snapshot) => {
         let income = 0;
         let expense = 0;
@@ -147,11 +163,7 @@ function loadDashboardData() {
 
 // Category change handler
 categorySelect.addEventListener('change', () => {
-    if (categorySelect.value === 'due') {
-        customerNameInput.style.display = 'block';
-    } else {
-        customerNameInput.style.display = 'none';
-    }
+    customerNameInput.style.display = categorySelect.value === 'due' ? 'block' : 'none';
 });
 
 // Add transaction
@@ -161,9 +173,8 @@ addTransactionBtn.addEventListener('click', async () => {
     const description = descriptionInput.value;
     const customerName = customerNameInput.value;
 
-    if (!amount) {
-        alert('Please enter an amount.');
-        return;
+    if (!amount || amount <= 0) {
+        return alert('Please enter a valid amount.');
     }
 
     const transactionData = {
@@ -175,42 +186,47 @@ addTransactionBtn.addEventListener('click', async () => {
 
     if (category === 'due') {
         if (!customerName) {
-            alert('Please enter a customer name for due.');
-            return;
+            return alert('Please enter a customer name for due.');
         }
         transactionData.customerName = customerName;
         transactionData.paid = false;
-    }
-
-    if (category.includes('income')) {
+        transactionData.type = 'due';
+    } else if (category.includes('income')) {
         transactionData.type = 'income';
     } else if (category.includes('expense')) {
         transactionData.type = 'expense';
     }
+    
+    try {
+        await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), transactionData);
 
-    // Add transaction to Firestore
-    await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), transactionData);
+        // Update balance only if it's not a 'due' transaction
+        if (category !== 'due') {
+            const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+            const balanceDoc = await getDoc(balanceDocRef);
+            if (balanceDoc.exists()) {
+                const currentBalance = balanceDoc.data();
+                let { online: newOnline, cash: newCash } = currentBalance;
 
-    // Update balance
-    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceDoc = await getDoc(balanceDocRef);
-    if (balanceDoc.exists()) {
-        const currentBalance = balanceDoc.data();
-        let newOnline = currentBalance.online;
-        let newCash = currentBalance.cash;
+                if (category === 'online-income') newOnline += amount;
+                if (category === 'cash-income') newCash += amount;
+                if (category === 'online-expense') newOnline -= amount;
+                if (category === 'cash-expense') newCash -= amount;
 
-        if (category === 'online-income') newOnline += amount;
-        if (category === 'cash-income') newCash += amount;
-        if (category === 'online-expense') newOnline -= amount;
-        if (category === 'cash-expense') newCash -= amount;
+                await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+            }
+        }
 
-        await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+        // Clear form
+        amountInput.value = '';
+        descriptionInput.value = '';
+        customerNameInput.value = '';
+        customerNameInput.style.display = 'none';
+
+    } catch (error) {
+        console.error("Transaction Error:", error);
+        alert(`Failed to add transaction: ${error.message}`);
     }
-
-    // Clear form
-    amountInput.value = '';
-    descriptionInput.value = '';
-    customerNameInput.value = '';
 });
 
 // Load transactions and dues
@@ -222,10 +238,16 @@ function loadTransactions() {
         snapshot.forEach(doc => {
             const transaction = doc.data();
             const li = document.createElement('li');
+            
+            let details = `${transaction.category}: ৳${transaction.amount}`;
+            if (transaction.customerName) details += ` - ${transaction.customerName}`;
+            if (transaction.description) details += ` (${transaction.description})`;
+
             li.innerHTML = `
-                <span>${transaction.category}: ৳${transaction.amount} ${transaction.description ? `(${transaction.description})` : ''}</span>
+                <span>${details}</span>
                 <button class="delete-btn" data-id="${doc.id}">Delete</button>
             `;
+
             if (transaction.category === 'due') {
                 duesUl.appendChild(li);
             } else {
@@ -238,30 +260,37 @@ function loadTransactions() {
 // Delete transaction
 appContainer.addEventListener('click', async (e) => {
     if (e.target.classList.contains('delete-btn')) {
+        if (!confirm("Are you sure you want to delete this transaction?")) return;
+
         const id = e.target.dataset.id;
         const transactionDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
         
-        // Get transaction to revert balance
-        const transactionDoc = await getDoc(transactionDocRef);
-        if (transactionDoc.exists()) {
-            const transaction = transactionDoc.data();
-            
-            const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-            const balanceDoc = await getDoc(balanceDocRef);
-            if (balanceDoc.exists()) {
-                const currentBalance = balanceDoc.data();
-                let newOnline = currentBalance.online;
-                let newCash = currentBalance.cash;
+        try {
+            const transactionDoc = await getDoc(transactionDocRef);
+            if (transactionDoc.exists()) {
+                const transaction = transactionDoc.data();
+                
+                // Revert balance change if it's not a due transaction
+                if (transaction.category !== 'due') {
+                    const balanceDocRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+                    const balanceDoc = await getDoc(balanceDocRef);
+                    if (balanceDoc.exists()) {
+                        const currentBalance = balanceDoc.data();
+                        let { online: newOnline, cash: newCash } = currentBalance;
 
-                if (transaction.category === 'online-income') newOnline -= transaction.amount;
-                if (transaction.category === 'cash-income') newCash -= transaction.amount;
-                if (transaction.category === 'online-expense') newOnline += transaction.amount;
-                if (transaction.category === 'cash-expense') newCash += transaction.amount;
+                        if (transaction.category === 'online-income') newOnline -= transaction.amount;
+                        if (transaction.category === 'cash-income') newCash -= transaction.amount;
+                        if (transaction.category === 'online-expense') newOnline += transaction.amount;
+                        if (transaction.category === 'cash-expense') newCash += transaction.amount;
 
-                await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+                        await updateDoc(balanceDocRef, { online: newOnline, cash: newCash });
+                    }
+                }
             }
+            await deleteDoc(transactionDocRef);
+        } catch (error) {
+            console.error("Delete Error:", error);
+            alert(`Failed to delete transaction: ${error.message}`);
         }
-        
-        await deleteDoc(transactionDocRef);
     }
 });
