@@ -43,7 +43,19 @@ saveInitialBalanceBtn.addEventListener('click', async () => {
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
     await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash }); showMainApp();
 });
-skipBalanceSetupBtn.addEventListener('click', async () => { await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online: 0, cash: 0 }); showMainApp(); });
+
+// *** CRITICAL FIX: The Skip button is now non-destructive ***
+skipBalanceSetupBtn.addEventListener('click', async () => {
+    // This button will now ONLY create a zero balance IF one doesn't already exist.
+    // It will NEVER overwrite an existing balance.
+    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    const balanceSnap = await getDoc(balanceRef);
+    if (!balanceSnap.exists()) {
+        await setDoc(balanceRef, { online: 0, cash: 0 });
+    }
+    showMainApp(); // Safely show the main app.
+});
+
 
 // Data Loading Functions
 datePicker.addEventListener('change', () => loadTransactionsForDate(datePicker.valueAsDate));
@@ -51,7 +63,12 @@ datePicker.addEventListener('change', () => loadTransactionsForDate(datePicker.v
 function loadDashboardData() {
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     onSnapshot(balanceRef, (doc) => {
-        if (!doc.exists()) return;
+        if (!doc.exists()) { // If balance doc somehow gets deleted, show 0.
+            document.getElementById('online-balance').textContent = `৳0.00`;
+            document.getElementById('cash-balance').textContent = `৳0.00`;
+            document.getElementById('total-balance').textContent = `৳0.00`;
+            return;
+        };
         const data = doc.data();
         document.getElementById('online-balance').textContent = `৳${data.online.toFixed(2)}`;
         document.getElementById('cash-balance').textContent = `৳${data.cash.toFixed(2)}`;
@@ -108,7 +125,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         
         let dueRef;
         if (existingDueSnap.empty) {
-            dueRef = doc(collection(db, 'users', currentUser.uid, 'dues')); // Get ref before transaction
+            dueRef = doc(collection(db, 'users', currentUser.uid, 'dues'));
         } else {
             dueRef = existingDueSnap.docs[0].ref;
         }
@@ -135,13 +152,14 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         const type = category.includes('income') ? 'income' : 'expense';
         await addDoc(collection(db, 'users', currentUser.uid, 'transactions'), { category, amount, description, type, timestamp: serverTimestamp() });
         const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-        const balanceDoc = await getDoc(balanceRef);
-        if (balanceDoc.exists()) {
+        await runTransaction(db, async (transaction) => {
+            const balanceDoc = await transaction.get(balanceRef);
+            if (!balanceDoc.exists()) throw "Balance document does not exist!";
             const b = balanceDoc.data();
             if (category === 'online-income') b.online += amount; else if (category === 'cash-income') b.cash += amount;
             else if (category === 'online-expense') b.online -= amount; else if (category === 'cash-expense') b.cash -= amount;
-            await updateDoc(balanceRef, b);
-        }
+            transaction.update(balanceRef, b);
+        });
     }
     transactionForm.reset(); customerNameInput.style.display = 'none';
 });
@@ -210,19 +228,24 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
     const paymentAmount = parseFloat(document.getElementById('new-payment-amount').value);
     const dueRef = doc(db, 'users', currentUser.uid, 'dues', currentOpenDueId);
     
-    await runTransaction(db, async (transaction) => {
-        const dueDoc = await transaction.get(dueRef);
-        if (!dueDoc.exists()) throw "Due does not exist!";
-        if (!paymentAmount || paymentAmount <= 0 || paymentAmount > dueDoc.data().remainingAmount) throw "সঠিক পেমেন্টের পরিমাণ দিন";
+    try {
+        await runTransaction(db, async (transaction) => {
+            const dueDoc = await transaction.get(dueRef);
+            if (!dueDoc.exists()) throw "Due does not exist!";
+            if (!paymentAmount || paymentAmount <= 0 || paymentAmount > dueDoc.data().remainingAmount) throw new Error("সঠিক পেমেন্টের পরিমাণ দিন");
 
-        const newPaid = dueDoc.data().paidAmount + paymentAmount;
-        const newRemaining = dueDoc.data().remainingAmount - paymentAmount;
-        transaction.update(dueRef, { paidAmount: newPaid, remainingAmount: newRemaining, status: newRemaining <= 0 ? 'paid' : 'partially-paid', lastUpdatedAt: serverTimestamp() });
-        const newPaymentRef = doc(collection(dueRef, 'payments'));
-        transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
-    });
-    document.getElementById('new-payment-amount').value = '';
+            const newPaid = dueDoc.data().paidAmount + paymentAmount;
+            const newRemaining = dueDoc.data().remainingAmount - paymentAmount;
+            transaction.update(dueRef, { paidAmount: newPaid, remainingAmount: newRemaining, status: newRemaining <= 0 ? 'paid' : 'partially-paid', lastUpdatedAt: serverTimestamp() });
+            const newPaymentRef = doc(collection(dueRef, 'payments'));
+            transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
+        });
+        document.getElementById('new-payment-amount').value = '';
+    } catch (e) {
+        alert(e.message);
+    }
 });
+
 
 // Delete Logic
 mainApp.addEventListener('click', async (e) => {
