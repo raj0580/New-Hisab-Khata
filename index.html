@@ -51,10 +51,6 @@
                 <label for="date-picker">দিন দেখুন:</label>
                 <input type="date" id="date-picker">
             </div>
-            <div id="daily-summary" class="card" style="display: none; margin-top: 15px; background-color: #e3f2fd;">
-                <h3 class="card-title" id="summary-date-title">দিনের শেষে ব্যালেন্স</h3>
-                <p id="daily-summary-text">অনলাইন: ৳0.00 | ক্যাশ: ৳0.00</p>
-            </div>
             
             <h2 class="section-title">নতুন লেনদেন যোগ করুন</h2>
             <form id="transaction-form">
@@ -78,7 +74,6 @@
         </div>
     </div>
     
-    <!-- *** Advanced Due Details Modal *** -->
     <div id="due-details-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -92,7 +87,6 @@
                     <div><strong>বাকি:</strong> <span id="modal-remaining-due"></span></div>
                 </div>
 
-                <!-- Items Section -->
                 <h3>আইটেম তালিকা</h3>
                 <ul id="modal-item-list"></ul>
                 <div class="add-new-item-form">
@@ -102,7 +96,6 @@
                     <button id="add-item-btn">আইটেম যোগ করুন</button>
                 </div>
                 
-                <!-- Payments Section -->
                 <h3>পেমেন্ট ইতিহাস</h3>
                 <ul id="modal-payment-history"></ul>
                 <div class="add-new-payment-form">
