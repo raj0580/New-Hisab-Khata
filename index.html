@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Auth Container -->
     <div id="auth-container" class="container">
         <h2>লগইন করুন</h2>
         <input type="email" id="email" placeholder="ইমেইল">
@@ -18,9 +17,7 @@
         <p>অ্যাকাউন্ট নেই? <a href="#" id="signup-link">সাইন আপ করুন</a></p>
     </div>
 
-    <!-- App Container (Initially Hidden) -->
     <div id="app-container" style="display: none;">
-        <!-- Initial Balance Setup Screen -->
         <div id="setup-screen" class="container" style="display: none;">
             <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
             <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
@@ -28,7 +25,6 @@
             <button id="save-initial-balance">সেভ করুন</button>
         </div>
 
-        <!-- Main App Screen -->
         <div id="main-app" class="container" style="display: none;">
             <header>
                 <h1>ড্যাশবোর্ড</h1>
@@ -43,16 +39,62 @@
                 <div class="card"><h3>নির্বাচিত দিনের ব্যয়</h3><p id="today-expense">৳0</p></div>
             </div>
 
-            <!-- Other app content will go here -->
+            <div id="date-filter">
+                <label for="date-picker">দিন দেখুন:</label>
+                <input type="date" id="date-picker">
+            </div>
+
+            <div id="transaction-form">
+                <h2>নতুন লেনদেন যোগ করুন</h2>
+                <select id="category">
+                    <option value="online-income">অনলাইন আয়</option> <option value="cash-income">ক্যাশ আয়</option>
+                    <option value="online-expense">অনলাইন খরচ</option> <option value="cash-expense">ক্যাশ খরচ</option>
+                    <option value="due">ডিউ (বকেয়া)</option>
+                </select>
+                <input type="number" id="amount" placeholder="টাকার পরিমাণ (৳)">
+                <input type="text" id="description" placeholder="বর্ণনা / আইটেম (যেমন: Charger, Headphone)">
+                <input type="text" id="customer-name" placeholder="কাস্টমারের নাম (ডিউ হলে)" style="display: none;">
+                <button id="add-transaction-btn">যোগ করুন</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-link active" onclick="openTab(event, 'all-transactions')">সকল লেনদেন</button>
+                <button class="tab-link" onclick="openTab(event, 'due-transactions')">ডিউ তালিকা</button>
+            </div>
+
+            <div id="all-transactions" class="tab-content active"> <ul id="transactions-list-ul"></ul> </div>
+            <div id="due-transactions" class="tab-content"> <ul id="due-list-ul"></ul> </div>
+        </div>
+    </div>
+    
+    <div id="due-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-customer-name"></h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div id="modal-body">
+                <p><strong>মোট বকেয়া:</strong> <span id="modal-remaining-due"></span></p>
+                <h3>পেমেন্ট ইতিহাস</h3>
+                <ul id="modal-payment-history"></ul>
+                <h3>নতুন পেমেন্ট যোগ করুন</h3>
+                <input type="number" id="new-payment-amount" placeholder="পেমেন্টের পরিমাণ">
+                <button id="add-payment-btn">পেমেন্ট যোগ করুন</button>
+            </div>
         </div>
     </div>
 
-    <!-- 
-        ******************************************************
-        ***   এখানে শুধুমাত্র app.js ফাইলটি লোড করা হবে   ***
-        *** অন্য কোনো ইনলাইন <script> ট্যাগ এখানে থাকবে না ***
-        ******************************************************
-    -->
+    <!-- শুধুমাত্র এই একটি script ট্যাগ থাকবে -->
     <script type="module" src="app.js"></script>
+    
+    <!-- Tab খোলার জন্য ছোট একটি inline script -->
+    <script>
+        function openTab(evt, tabName) {
+            document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+            document.querySelectorAll(".tab-link").forEach(link => link.classList.remove("active"));
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.classList.add("active");
+        }
+    </script>
 </body>
 </html>
