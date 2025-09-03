@@ -43,20 +43,25 @@ saveInitialBalanceBtn.addEventListener('click', async () => {
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
     await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash, createdAt: serverTimestamp() }); showMainApp();
 });
+
 skipBalanceSetupBtn.addEventListener('click', async () => {
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     const balanceSnap = await getDoc(balanceRef);
-    if (!balanceSnap.exists()) { await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0, createdAt: serverTimestamp() }); }
+    if (!balanceSnap.exists()) {
+        await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0, createdAt: serverTimestamp() });
+    }
     showMainApp();
 });
 
-// Data Loading & Reporting
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
 
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
-        if (!doc.exists()) return;
+        if (!doc.exists()) {
+            ['online-balance', 'cash-balance', 'total-balance'].forEach(id => document.getElementById(id).textContent = '৳0.00');
+            return;
+        };
         const data = doc.data();
         document.getElementById('online-balance').textContent = `৳${data.online.toFixed(2)}`;
         document.getElementById('cash-balance').textContent = `৳${data.cash.toFixed(2)}`;
@@ -71,7 +76,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
 
     const transactionsQuery = query(collection(db, `users/${currentUser.uid}/transactions`), orderBy('timestamp'));
     const transactionsSnap = await getDocs(transactionsQuery);
-    const allTransactions = transactionsSnap.docs.map(d => d.data());
+    const allTransactions = transactionsSnap.docs.map(d => ({id: d.id, ...d.data()}));
     
     const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
     const initialBalance = balanceDoc.exists() ? { online: balanceDoc.data().initialOnline || 0, cash: balanceDoc.data().initialCash || 0 } : { online: 0, cash: 0 };
@@ -98,8 +103,11 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     });
 
     const profitLoss = dailyIncome - dailyExpense;
-    const closingOnline = openingOnline + allTransactions.filter(t => t.timestamp.toDate() >= startOfDay && t.timestamp.toDate() <= endOfDay && t.category.includes('online')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
-    const closingCash = openingCash + allTransactions.filter(t => t.timestamp.toDate() >= startOfDay && t.timestamp.toDate() <= endOfDay && t.category.includes('cash')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
+    const dailyOnlineChange = allTransactions.filter(t => t.timestamp.toDate() >= startOfDay && t.timestamp.toDate() <= endOfDay && t.category.includes('online')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
+    const dailyCashChange = allTransactions.filter(t => t.timestamp.toDate() >= startOfDay && t.timestamp.toDate() <= endOfDay && t.category.includes('cash')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
+
+    const closingOnline = openingOnline + dailyOnlineChange;
+    const closingCash = openingCash + dailyCashChange;
     
     document.getElementById('opening-balance').textContent = `৳${(openingOnline + openingCash).toFixed(2)}`;
     document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
@@ -109,7 +117,6 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     profitLossEl.style.color = profitLoss >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
     document.getElementById('closing-balance').textContent = `৳${(closingOnline + closingCash).toFixed(2)}`;
 }
-
 
 function loadAllDuesAndPayables() {
     const dueQuery = query(collection(db, `users/${currentUser.uid}/dues`), where('status', '!=', 'paid'), orderBy('customerName'));
@@ -126,10 +133,8 @@ function loadAllDuesAndPayables() {
 }
 
 async function renderMonthlyChart() {
-    // This is a simplified version. For full accuracy, it should calculate closing balance for each of the last 30 days.
-    // This can be slow. A better approach is to store daily snapshots in a separate collection.
     const labels = [...Array(30)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); return d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}); }).reverse();
-    const data = labels.map(() => Math.random() * 10000 + 5000); // Placeholder data for performance
+    const data = labels.map(() => Math.random() * 10000 + 5000); // Placeholder data
     
     const ctx = document.getElementById('monthly-chart').getContext('2d');
     if (monthlyChart) monthlyChart.destroy();
@@ -140,10 +145,8 @@ async function renderMonthlyChart() {
     });
 }
 
-// Add Entry Logic
-categorySelect.addEventListener('change', () => {
-    personNameInput.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none';
-});
+categorySelect.addEventListener('change', () => { personNameInput.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
+
 document.getElementById('add-transaction-btn').addEventListener('click', async () => {
     const category = categorySelect.value;
     const amount = parseFloat(document.getElementById('amount').value);
@@ -152,18 +155,18 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     if (!amount || amount <= 0) return alert('সঠিক পরিমাণ দিন।');
     
     const isDueOrPayable = ['due', 'payable'].includes(category);
-    const collectionName = category === 'due' ? 'dues' : 'payables';
-    const nameField = category === 'due' ? 'customerName' : 'personName';
-
+    if(isDueOrPayable && !person) return alert('ব্যক্তির নাম দিন।');
+    
     if (isDueOrPayable) {
-        if (!person) return alert('ব্যক্তির নাম দিন।');
+        const collectionName = category === 'due' ? 'dues' : 'payables';
+        const nameField = category === 'due' ? 'customerName' : 'personName';
         const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', '!=', 'paid'));
         const existingEntrySnap = await getDocs(q);
         let entryRef = existingEntrySnap.empty ? doc(collection(db, `users/${currentUser.uid}/${collectionName}`)) : existingEntrySnap.docs[0].ref;
         
         await runTransaction(db, async (transaction) => {
             const docSnap = await transaction.get(entryRef);
-            const data = { name: description, amount, date: serverTimestamp() };
+            const data = { name: description || 'N/A', amount, date: serverTimestamp() };
             if (!docSnap.exists()) {
                 const newEntry = { status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp() };
                 newEntry[nameField] = person;
@@ -191,16 +194,44 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     transactionForm.reset(); personNameInput.style.display = 'none';
 });
 
-// Modal, Item, Payment, Delete Logic
 function setupModalEventListeners(listId) {
     document.getElementById(listId).addEventListener('click', e => {
         if (!e.target.classList.contains('view-due-btn')) return;
         const listItem = e.target.closest('li');
         currentOpenEntryId = listItem.dataset.id;
-        currentOpenEntryType = listItem.dataset.type; // 'dues' or 'payables'
+        currentOpenEntryType = listItem.dataset.type;
         const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
         
-        onSnapshot(entryRef, d => { /* ... Render modal with data ... */ });
+        onSnapshot(entryRef, d => {
+            if (!d.exists()) { modal.style.display = 'none'; return; }
+            const data = d.data();
+            const name = data.customerName || data.personName;
+            document.getElementById('modal-person-name').textContent = name;
+            document.getElementById('modal-total').textContent = `৳${data.totalAmount.toFixed(2)}`;
+            document.getElementById('modal-paid').textContent = `৳${data.paidAmount.toFixed(2)}`;
+            document.getElementById('modal-remaining').textContent = `৳${data.remainingAmount.toFixed(2)}`;
+            
+            const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
+            onSnapshot(itemsQuery, i_snap => {
+                const itemListUl = document.getElementById('modal-item-list');
+                itemListUl.innerHTML = '';
+                i_snap.forEach(i_doc => {
+                    const item = i_doc.data();
+                    const dateStr = item.date ? item.date.toDate().toLocaleDateString() : '';
+                    itemListUl.innerHTML += `<li><span>${item.name} <small>(${dateStr})</small></span><span>৳${item.amount.toFixed(2)}</span></li>`;
+                });
+            });
+            
+            const paymentsQuery = query(collection(entryRef, 'payments'), orderBy('paymentDate', 'desc'));
+            onSnapshot(paymentsQuery, p_snap => {
+                const historyUl = document.getElementById('modal-payment-history');
+                historyUl.innerHTML = '';
+                p_snap.forEach(p_doc => {
+                    const p = p_doc.data();
+                    if (p.paymentDate) { historyUl.innerHTML += `<li>${p.paymentDate.toDate().toLocaleDateString()}: ৳${p.amount.toFixed(2)}</li>`; }
+                });
+            });
+        });
         modal.style.display = 'block';
     });
 }
@@ -208,4 +239,65 @@ setupModalEventListeners('due-list-ul');
 setupModalEventListeners('payable-list-ul');
 
 document.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
-// Add item/payment and delete logic would need to be updated to use currentOpenEntryType
+
+document.getElementById('add-item-btn').addEventListener('click', async () => {
+    const itemName = document.getElementById('new-item-name').value;
+    const itemAmount = parseFloat(document.getElementById('new-item-amount').value);
+    if (!itemName || !itemAmount || itemAmount <= 0) return alert('সঠিক আইটেম ও দাম দিন।');
+
+    const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
+    await runTransaction(db, async (transaction) => {
+        const docSnap = await transaction.get(entryRef);
+        if (!docSnap.exists()) throw "Entry does not exist!";
+        const newTotal = docSnap.data().totalAmount + itemAmount;
+        const newRemaining = docSnap.data().remainingAmount + itemAmount;
+        transaction.update(entryRef, { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() });
+        const newItemRef = doc(collection(entryRef, 'items'));
+        transaction.set(newItemRef, { name: itemName, amount: itemAmount, date: serverTimestamp() });
+    });
+    document.getElementById('new-item-name').value = '';
+    document.getElementById('new-item-amount').value = '';
+});
+
+document.getElementById('add-payment-btn').addEventListener('click', async () => {
+    const paymentAmount = parseFloat(document.getElementById('new-payment-amount').value);
+    const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const docSnap = await transaction.get(entryRef);
+            if (!docSnap.exists()) throw "Entry does not exist!";
+            if (!paymentAmount || paymentAmount <= 0 || paymentAmount > docSnap.data().remainingAmount) throw new Error("সঠিক পেমেন্টের পরিমাণ দিন");
+            const newPaid = docSnap.data().paidAmount + paymentAmount;
+            const newRemaining = docSnap.data().remainingAmount - paymentAmount;
+            transaction.update(entryRef, { paidAmount: newPaid, remainingAmount: newRemaining, status: newRemaining <= 0 ? 'paid' : 'partially-paid', lastUpdatedAt: serverTimestamp() });
+            const newPaymentRef = doc(collection(entryRef, 'payments'));
+            transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
+        });
+        document.getElementById('new-payment-amount').value = '';
+    } catch (e) { alert(e.message); }
+});
+
+mainApp.addEventListener('click', async (e) => {
+    if (!e.target.classList.contains('delete-btn')) return;
+    const id = e.target.dataset.id; const type = e.target.dataset.type;
+    if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+    if (type === 'transaction') {
+        const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
+        const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
+        try {
+            await runTransaction(db, async (t) => {
+                const transDoc = await t.get(transRef);
+                const balanceDoc = await t.get(balanceRef);
+                if (!transDoc.exists() || !balanceDoc.exists()) throw "Document not found";
+                const tData = transDoc.data();
+                const bData = balanceDoc.data();
+                if (tData.category === 'online-income') bData.online -= tData.amount;
+                else if (tData.category === 'cash-income') bData.cash -= tData.amount;
+                else if (tData.category === 'online-expense') bData.online += tData.amount;
+                else if (tData.category === 'cash-expense') bData.cash += tData.amount;
+                t.update(balanceRef, bData);
+                t.delete(transRef);
+            });
+        } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
+    }
+});
