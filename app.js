@@ -50,10 +50,13 @@ saveInitialBalanceBtn.addEventListener('click', async () => {
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
     await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash, createdAt: serverTimestamp() }); showMainApp();
 });
+
 skipBalanceSetupBtn.addEventListener('click', async () => {
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     const balanceSnap = await getDoc(balanceRef);
-    if (!balanceSnap.exists()) { await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0, createdAt: serverTimestamp() }); }
+    if (!balanceSnap.exists()) {
+        await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0, createdAt: serverTimestamp() });
+    }
     showMainApp();
 });
 
@@ -318,4 +321,32 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
         });
         document.getElementById('new-payment-amount').value = '';
     } catch (e) { alert(e.message); }
-    
+});
+
+mainApp.addEventListener('click', async (e) => {
+    if (!e.target.classList.contains('delete-btn')) return;
+    const id = e.target.dataset.id; const type = e.target.dataset.type;
+    if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+    if (type === 'transaction') {
+        const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
+        const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
+        try {
+            await runTransaction(db, async (t) => {
+                const transDoc = await t.get(transRef);
+                const balanceDoc = await t.get(balanceRef);
+                if (!transDoc.exists() || !balanceDoc.exists()) throw "Document not found";
+                const tData = transDoc.data();
+                const bData = balanceDoc.data();
+                if (tData.category === 'online-income') bData.online -= tData.amount;
+                else if (tData.category === 'cash-income') bData.cash -= tData.amount;
+                else if (tData.category === 'online-expense') bData.online += tData.amount;
+                else if (tData.category === 'cash-expense') bData.cash += tData.amount;
+                t.update(balanceRef, bData);
+                t.delete(transRef);
+            });
+            await fetchAllTransactionsOnce();
+            loadTransactionsAndReportForDate(datePicker.valueAsDate);
+            renderMonthlyChart();
+        } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
+    }
+});
