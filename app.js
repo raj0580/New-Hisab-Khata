@@ -12,7 +12,7 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), transactionForm = document.getElementById('transaction-form'), saveInitialBalanceBtn = document.getElementById('save-initial-balance'), skipBalanceSetupBtn = document.getElementById('skip-balance-setup'), modal = document.getElementById('details-modal');
-let currentUser, currentOpenEntryId, currentOpenEntryType, monthlyChart, hasCheckedBalance = false, allTransactionsCache = [];
+let currentUser, currentOpenEntryId, currentOpenEntryType, weeklyChart, hasCheckedBalance = false;
 
 // Auth State Logic
 onAuthStateChanged(auth, user => {
@@ -21,7 +21,10 @@ onAuthStateChanged(auth, user => {
 });
 loginBtn.addEventListener('click', () => signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)));
 signupLink.addEventListener('click', e => { e.preventDefault(); createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)); });
-logoutBtn.addEventListener('click', () => signOut(auth));
+logoutBtn.addEventListener('click', async () => {
+    await takeDailySnapshot(); 
+    signOut(auth);
+});
 
 async function checkInitialBalance() {
     if (!currentUser || hasCheckedBalance) return;
@@ -29,42 +32,68 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
+        // *** NEW: Automatic Midnight Snapshot Logic ***
+        // অ্যাপ খোলার সাথে সাথে চেক করবে যে আগের দিনের স্ন্যাপশট নেওয়া হয়েছে কিনা
+        const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
+        if (lastSnapshotDateStr) {
+            const todayStr = getDateId(new Date());
+            if (lastSnapshotDateStr !== todayStr) {
+                const lastDate = new Date(lastSnapshotDateStr);
+                await takeDailySnapshot(lastDate); // আগের দিনের স্ন্যাপশট নিয়ে নেবে
+            }
+        }
+
         balanceSnap.exists() ? showMainApp() : (setupScreen.style.display = 'block', mainApp.style.display = 'none');
-    } catch (error) { console.error("Error checking balance:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
+    } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
 
 async function showMainApp() {
     setupScreen.style.display = 'none'; mainApp.style.display = 'block';
     if(datePicker) {
         datePicker.valueAsDate = new Date();
-        await fetchAllTransactionsOnce();
         loadDashboardData();
         loadTransactionsAndReportForDate(datePicker.valueAsDate); 
         loadAllDuesAndPayables();
-        renderMonthlyChart();
+        renderWeeklyChart();
     }
 }
 
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
-    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash, createdAt: serverTimestamp() }); showMainApp();
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash });
+    await takeDailySnapshot(new Date(), { online, cash });
+    showMainApp();
 });
-
 skipBalanceSetupBtn.addEventListener('click', async () => {
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     const balanceSnap = await getDoc(balanceRef);
     if (!balanceSnap.exists()) {
-        await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0, createdAt: serverTimestamp() });
+        await setDoc(balanceRef, { online: 0, cash: 0, initialOnline: 0, initialCash: 0 });
+        await takeDailySnapshot(new Date(), { online: 0, cash: 0 });
     }
     showMainApp();
 });
 
-async function fetchAllTransactionsOnce() {
+function getDateId(date) { return date.toISOString().split('T')[0]; }
+
+async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
-    const transactionsQuery = query(collection(db, `users/${currentUser.uid}/transactions`), orderBy('timestamp'));
-    const transactionsSnap = await getDocs(transactionsQuery);
-    allTransactionsCache = transactionsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+    const dateId = getDateId(date);
+    const snapshotRef = doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`);
+    let closingBalance = forceBalance;
+    if (!closingBalance) {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        closingBalance = balanceDoc.exists() ? balanceDoc.data() : { online: 0, cash: 0 };
+    }
+    await setDoc(snapshotRef, {
+        closingOnline: closingBalance.online,
+        closingCash: closingBalance.cash,
+        timestamp: serverTimestamp()
+    });
+    localStorage.setItem(`lastSnapshot_${currentUser.uid}`, dateId); // Save the date of the last snapshot
+    console.log(`Snapshot taken for ${dateId}`);
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
@@ -87,113 +116,86 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     if (!currentUser) return;
     const startOfDay = new Date(selectedDate); startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(selectedDate); endOfDay.setHours(23, 59, 59, 999);
-
-    const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
-    const initialBalance = balanceDoc.exists() ? { online: balanceDoc.data().initialOnline || 0, cash: balanceDoc.data().initialCash || 0 } : { online: 0, cash: 0 };
     
-    let openingOnline = initialBalance.online;
-    let openingCash = initialBalance.cash;
+    const todayTransQuery = query(collection(db, `users/${currentUser.uid}/transactions`), where('timestamp', '>=', startOfDay), where('timestamp', '<=', endOfDay), orderBy('timestamp', 'desc'));
+    onSnapshot(todayTransQuery, snapshot => {
+        let dailyIncome = 0, dailyExpense = 0;
+        const list = document.getElementById('transactions-list-ul'); list.innerHTML = '';
+        snapshot.forEach(doc => {
+            const t = doc.data();
+            if (t.type === 'income') dailyIncome += t.amount;
+            if (t.type === 'expense') dailyExpense += t.amount;
+            list.innerHTML += `<li><span>${t.category}: ৳${t.amount} (${t.description})</span> <button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></li>`;
+        });
+        document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
+        document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
+        const profitLoss = dailyIncome - dailyExpense;
+        const profitLossEl = document.getElementById('profit-loss');
+        profitLossEl.textContent = `৳${profitLoss.toFixed(2)}`;
+        profitLossEl.style.color = profitLoss >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    });
 
-    allTransactionsCache.forEach(t => {
-        if (t.timestamp.toDate() < startOfDay) {
-            if (t.category === 'online-income') openingOnline += t.amount;
-            else if (t.category === 'cash-income') openingCash += t.amount;
-            else if (t.category === 'online-expense') openingOnline -= t.amount;
-            else if (t.category === 'cash-expense') openingCash -= t.amount;
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const prevDayId = getDateId(previousDay);
+    const prevDaySnapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${prevDayId}`));
+
+    let openingOnline = 0, openingCash = 0;
+    if (prevDaySnapshotDoc.exists()) {
+        openingOnline = prevDaySnapshotDoc.data().closingOnline;
+        openingCash = prevDaySnapshotDoc.data().closingCash;
+    } else {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        if(balanceDoc.exists()) {
+            openingOnline = balanceDoc.data().initialOnline || 0;
+            openingCash = balanceDoc.data().initialCash || 0;
         }
-    });
-
-    let dailyIncome = 0, dailyExpense = 0;
-    const list = document.getElementById('transactions-list-ul');
-    list.innerHTML = '';
-    const todaysTransactions = allTransactionsCache.filter(t => t.timestamp.toDate() >= startOfDay && t.timestamp.toDate() <= endOfDay);
-    
-    todaysTransactions.forEach(t => {
-        if (t.type === 'income') dailyIncome += t.amount;
-        if (t.type === 'expense') dailyExpense += t.amount;
-        list.innerHTML += `<li><span>${t.category}: ৳${t.amount} (${t.description})</span> <button class="delete-btn" data-id="${t.id}" data-type="transaction">🗑️</button></li>`;
-    });
-
-    const profitLoss = dailyIncome - dailyExpense;
-    const dailyOnlineChange = todaysTransactions.filter(t => t.category.includes('online')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
-    const dailyCashChange = todaysTransactions.filter(t => t.category.includes('cash')).reduce((acc, curr) => acc + (curr.type === 'income' ? curr.amount : -curr.amount), 0);
-    
-    const closingOnline = openingOnline + dailyOnlineChange;
-    const closingCash = openingCash + dailyCashChange;
-    
+    }
     document.getElementById('opening-balance').textContent = `৳${(openingOnline + openingCash).toFixed(2)}`;
-    document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
-    document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
-    const profitLossEl = document.getElementById('profit-loss');
-    profitLossEl.textContent = `৳${profitLoss.toFixed(2)}`;
-    profitLossEl.style.color = profitLoss >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-    document.getElementById('closing-balance').textContent = `অনলাইন: ৳${closingOnline.toFixed(2)} | ক্যাশ: ৳${closingCash.toFixed(2)}`;
+
+    const todayId = getDateId(new Date());
+    const selectedId = getDateId(selectedDate);
+    if (todayId === selectedId) {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        if (balanceDoc.exists()) {
+            const current = balanceDoc.data();
+            document.getElementById('closing-balance').textContent = `অনলাইন: ৳${current.online.toFixed(2)} | ক্যাশ: ৳${current.cash.toFixed(2)}`;
+        }
+    } else {
+        const selectedSnapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${selectedId}`));
+        if (selectedSnapshotDoc.exists()) {
+            const snapshotData = selectedSnapshotDoc.data();
+            document.getElementById('closing-balance').textContent = `অনলাইন: ৳${snapshotData.closingOnline.toFixed(2)} | ক্যাশ: ৳${snapshotData.closingCash.toFixed(2)}`;
+        } else {
+            document.getElementById('closing-balance').textContent = 'হিসাব নেই';
+        }
+    }
 }
 
-function loadAllDuesAndPayables() {
-    const dueQuery = query(collection(db, `users/${currentUser.uid}/dues`), where('status', '!=', 'paid'), orderBy('customerName'));
-    onSnapshot(dueQuery, snapshot => {
-        const list = document.getElementById('due-list-ul'); list.innerHTML = '';
-        snapshot.forEach(doc => {
-            list.innerHTML += `<li data-id="${doc.id}" data-type="dues"><span><strong>${doc.data().customerName}</strong> - বাকি: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`;
-        });
-    });
-
-    const payableQuery = query(collection(db, `users/${currentUser.uid}/payables`), where('status', '!=', 'paid'), orderBy('personName'));
-    onSnapshot(payableQuery, snapshot => {
-        const list = document.getElementById('payable-list-ul'); list.innerHTML = '';
-        snapshot.forEach(doc => {
-            list.innerHTML += `<li data-id="${doc.id}" data-type="payables"><span><strong>${doc.data().personName}</strong> - দিতে হবে: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`;
-        });
-    });
-}
-
-async function renderMonthlyChart() {
-    if (!allTransactionsCache.length && !(await getDoc(doc(db, `users/${currentUser.uid}/balance/main`))).exists()) return;
-
-    const labels = [];
-    const onlineData = [];
-    const cashData = [];
-    
-    const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
-    const initialBalance = balanceDoc.exists() ? { online: balanceDoc.data().initialOnline || 0, cash: balanceDoc.data().initialCash || 0 } : { online: 0, cash: 0 };
-    
-    let runningOnline = initialBalance.online;
-    let runningCash = initialBalance.cash;
-    
-    const transactionsByDate = {};
-    allTransactionsCache.forEach(t => {
-        const dateStr = t.timestamp.toDate().toISOString().split('T')[0];
-        if (!transactionsByDate[dateStr]) transactionsByDate[dateStr] = [];
-        transactionsByDate[dateStr].push(t);
-    });
-
-    for (let i = 29; i >= 0; i--) {
+async function renderWeeklyChart() {
+    const labels = [], onlineData = [], cashData = [];
+    for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
         labels.push(d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}));
-        if (transactionsByDate[dateStr]) {
-            transactionsByDate[dateStr].forEach(t => {
-                if (t.category.includes('online')) runningOnline += (t.type === 'income' ? t.amount : -t.amount);
-                if (t.category.includes('cash')) runningCash += (t.type === 'income' ? t.amount : -t.amount);
-            });
+        const dateId = getDateId(d);
+        const snapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`));
+        if (snapshotDoc.exists()) {
+            onlineData.push(snapshotDoc.data().closingOnline);
+            cashData.push(snapshotDoc.data().closingCash);
+        } else {
+            onlineData.push(null);
+            cashData.push(null);
         }
-        onlineData.push(runningOnline);
-        cashData.push(runningCash);
     }
-    
     const ctx = document.getElementById('monthly-chart').getContext('2d');
-    if (monthlyChart) monthlyChart.destroy();
-    monthlyChart = new Chart(ctx, {
+    if (weeklyChart) weeklyChart.destroy();
+    weeklyChart = new Chart(ctx, {
         type: 'line',
-        data: { 
-            labels, 
-            datasets: [
-                { label: 'অনলাইন ব্যালেন্স', data: onlineData, borderColor: '#2196F3', backgroundColor: 'rgba(33, 150, 243, 0.1)', fill: true, tension: 0.1 },
-                { label: 'ক্যাশ ব্যালেন্স', data: cashData, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.1 }
-            ] 
-        },
+        data: { labels, datasets: [
+                { label: 'অনলাইন ব্যালেন্স', data: onlineData, borderColor: '#2196F3', backgroundColor: 'rgba(33, 150, 243, 0.1)', fill: true, tension: 0.2, spanGaps: true },
+                { label: 'ক্যাশ ব্যালেন্স', data: cashData, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.2, spanGaps: true }
+            ] },
         options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
     });
 }
@@ -233,8 +235,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
             });
         } catch (e) { console.error("Transaction failed: ", e); alert("এন্ট্রি যোগ করতে সমস্যা হয়েছে। Firebase Index তৈরি করেছেন কি?"); }
     } else {
-        const type = category.includes('income') ? 'income' : 'expense';
-        await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type, timestamp: serverTimestamp() });
+        await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
         await runTransaction(db, async (t) => {
             const balanceDoc = await t.get(balanceRef);
@@ -246,10 +247,23 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         });
     }
     transactionForm.reset(); personNameInput.style.display = 'none';
-    await fetchAllTransactionsOnce();
+    await takeDailySnapshot();
     loadTransactionsAndReportForDate(datePicker.valueAsDate);
-    renderMonthlyChart();
+    renderWeeklyChart();
 });
+
+function loadAllDuesAndPayables() {
+    const dueQuery = query(collection(db, `users/${currentUser.uid}/dues`), where('status', '!=', 'paid'), orderBy('customerName'));
+    onSnapshot(dueQuery, snapshot => {
+        const list = document.getElementById('due-list-ul'); list.innerHTML = '';
+        snapshot.forEach(doc => { list.innerHTML += `<li data-id="${doc.id}" data-type="dues"><span><strong>${doc.data().customerName}</strong> - বাকি: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`; });
+    });
+    const payableQuery = query(collection(db, `users/${currentUser.uid}/payables`), where('status', '!=', 'paid'), orderBy('personName'));
+    onSnapshot(payableQuery, snapshot => {
+        const list = document.getElementById('payable-list-ul'); list.innerHTML = '';
+        snapshot.forEach(doc => { list.innerHTML += `<li data-id="${doc.id}" data-type="payables"><span><strong>${doc.data().personName}</strong> - দিতে হবে: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`; });
+    });
+}
 
 function setupModalEventListeners(listId) {
     document.getElementById(listId).addEventListener('click', e => {
@@ -258,7 +272,6 @@ function setupModalEventListeners(listId) {
         currentOpenEntryId = listItem.dataset.id;
         currentOpenEntryType = listItem.dataset.type;
         const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
-        
         onSnapshot(entryRef, d => {
             if (!d.exists()) { modal.style.display = 'none'; return; }
             const data = d.data();
@@ -290,7 +303,6 @@ document.getElementById('add-item-btn').addEventListener('click', async () => {
     const itemName = document.getElementById('new-item-name').value;
     const itemAmount = parseFloat(document.getElementById('new-item-amount').value);
     if (!itemName || !itemAmount || itemAmount <= 0) return alert('সঠিক আইটেম ও দাম দিন।');
-
     const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
     await runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(entryRef);
@@ -345,8 +357,9 @@ mainApp.addEventListener('click', async (e) => {
                 t.delete(transRef);
             });
             await fetchAllTransactionsOnce();
+            await takeDailySnapshot();
             loadTransactionsAndReportForDate(datePicker.valueAsDate);
-            renderMonthlyChart();
+            renderWeeklyChart();
         } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
     }
 });
