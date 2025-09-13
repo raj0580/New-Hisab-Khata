@@ -12,7 +12,7 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), transactionForm = document.getElementById('transaction-form'), saveInitialBalanceBtn = document.getElementById('save-initial-balance'), skipBalanceSetupBtn = document.getElementById('skip-balance-setup'), modal = document.getElementById('details-modal');
-let currentUser, currentOpenEntryId, currentOpenEntryType, weeklyChart, hasCheckedBalance = false;
+let currentUser, currentOpenEntryId, currentOpenEntryType, monthlyChart, hasCheckedBalance = false;
 
 // Auth State Logic
 onAuthStateChanged(auth, user => {
@@ -33,14 +33,12 @@ async function checkInitialBalance() {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
         
-        // *** NEW: Automatic Midnight Snapshot Logic ***
-        // অ্যাপ খোলার সাথে সাথে চেক করবে যে আগের দিনের স্ন্যাপশট নেওয়া হয়েছে কিনা
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
             if (lastSnapshotDateStr !== todayStr) {
                 const lastDate = new Date(lastSnapshotDateStr);
-                await takeDailySnapshot(lastDate); // আগের দিনের স্ন্যাপশট নিয়ে নেবে
+                await takeDailySnapshot(lastDate);
             }
         }
 
@@ -55,7 +53,7 @@ async function showMainApp() {
         loadDashboardData();
         loadTransactionsAndReportForDate(datePicker.valueAsDate); 
         loadAllDuesAndPayables();
-        renderWeeklyChart();
+        renderMonthlyChart();
     }
 }
 
@@ -87,12 +85,8 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
         const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
         closingBalance = balanceDoc.exists() ? balanceDoc.data() : { online: 0, cash: 0 };
     }
-    await setDoc(snapshotRef, {
-        closingOnline: closingBalance.online,
-        closingCash: closingBalance.cash,
-        timestamp: serverTimestamp()
-    });
-    localStorage.setItem(`lastSnapshot_${currentUser.uid}`, dateId); // Save the date of the last snapshot
+    await setDoc(snapshotRef, { closingOnline: closingBalance.online, closingCash: closingBalance.cash, timestamp: serverTimestamp() });
+    localStorage.setItem(`lastSnapshot_${currentUser.uid}`, dateId);
     console.log(`Snapshot taken for ${dateId}`);
 }
 
@@ -172,9 +166,9 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     }
 }
 
-async function renderWeeklyChart() {
+async function renderMonthlyChart() {
     const labels = [], onlineData = [], cashData = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 29; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}));
@@ -189,8 +183,8 @@ async function renderWeeklyChart() {
         }
     }
     const ctx = document.getElementById('monthly-chart').getContext('2d');
-    if (weeklyChart) weeklyChart.destroy();
-    weeklyChart = new Chart(ctx, {
+    if (monthlyChart) monthlyChart.destroy();
+    monthlyChart = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets: [
                 { label: 'অনলাইন ব্যালেন্স', data: onlineData, borderColor: '#2196F3', backgroundColor: 'rgba(33, 150, 243, 0.1)', fill: true, tension: 0.2, spanGaps: true },
@@ -249,7 +243,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     transactionForm.reset(); personNameInput.style.display = 'none';
     await takeDailySnapshot();
     loadTransactionsAndReportForDate(datePicker.valueAsDate);
-    renderWeeklyChart();
+    renderMonthlyChart();
 });
 
 function loadAllDuesAndPayables() {
@@ -359,7 +353,7 @@ mainApp.addEventListener('click', async (e) => {
             await fetchAllTransactionsOnce();
             await takeDailySnapshot();
             loadTransactionsAndReportForDate(datePicker.valueAsDate);
-            renderWeeklyChart();
+            renderMonthlyChart();
         } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
     }
 });
