@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>আমার ব্যবসার হিসাব Pro</title>
+    <title>রাজিব এর ব্যবসার হিসাব Pro</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2196F3">
     <link rel="stylesheet" href="style.css">
@@ -46,9 +46,17 @@
             </div>
             
             <h2 class="section-title">মাসিক গ্রাফ (স্ক্রল করুন)</h2>
-            <div class="chart-container-wrapper">
-                <div class="chart-container">
-                    <canvas id="monthly-chart"></canvas>
+            <div class="split-chart-container">
+                <div class="chart-y-axis left">
+                    <canvas id="y-axis-chart-left"></canvas>
+                </div>
+                <div class="chart-container-wrapper">
+                    <div class="chart-container">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-y-axis right">
+                    <canvas id="y-axis-chart-right"></canvas>
                 </div>
             </div>
 
