@@ -1,6 +1,6 @@
 {
-  "name": "Finance Tracker",
-  "short_name": "FinanceApp",
+  "name": "রাজিব এর ব্যবসার হিসাব",
+  "short_name": "ব্যবসার হিসাব",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
