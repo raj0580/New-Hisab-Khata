@@ -32,7 +32,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -41,7 +40,6 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-
         balanceSnap.exists() ? showMainApp() : (setupScreen.style.display = 'block', mainApp.style.display = 'none');
     } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
@@ -167,6 +165,11 @@ async function loadTransactionsAndReportForDate(selectedDate) {
 }
 
 async function renderMonthlyChart() {
+    const canvas = document.getElementById('monthly-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (monthlyChart) monthlyChart.destroy();
+    
     const labels = [], onlineData = [], cashData = [];
     for (let i = 29; i >= 0; i--) {
         const d = new Date();
@@ -182,16 +185,23 @@ async function renderMonthlyChart() {
             cashData.push(null);
         }
     }
-    const ctx = document.getElementById('monthly-chart').getContext('2d');
-    if (monthlyChart) monthlyChart.destroy();
+    
     monthlyChart = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets: [
                 { label: 'অনলাইন ব্যালেন্স', data: onlineData, borderColor: '#2196F3', backgroundColor: 'rgba(33, 150, 243, 0.1)', fill: true, tension: 0.2, spanGaps: true },
                 { label: 'ক্যাশ ব্যালেন্স', data: cashData, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.2, spanGaps: true }
             ] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+        options: {
+            responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } },
+            plugins: { legend: { position: 'top', align: 'start', labels: { boxWidth: 20, padding: 20 } } }
+        }
     });
+
+    const chartWrapper = document.querySelector('.chart-container-wrapper');
+    if (chartWrapper) {
+        chartWrapper.scrollLeft = chartWrapper.scrollWidth;
+    }
 }
 
 categorySelect.addEventListener('change', () => { personNameInput.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
@@ -250,12 +260,17 @@ function loadAllDuesAndPayables() {
     const dueQuery = query(collection(db, `users/${currentUser.uid}/dues`), where('status', '!=', 'paid'), orderBy('customerName'));
     onSnapshot(dueQuery, snapshot => {
         const list = document.getElementById('due-list-ul'); list.innerHTML = '';
-        snapshot.forEach(doc => { list.innerHTML += `<li data-id="${doc.id}" data-type="dues"><span><strong>${doc.data().customerName}</strong> - বাকি: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`; });
+        snapshot.forEach(doc => {
+            list.innerHTML += `<li data-id="${doc.id}" data-type="dues"><span><strong>${doc.data().customerName}</strong> - বাকি: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`;
+        });
     });
+
     const payableQuery = query(collection(db, `users/${currentUser.uid}/payables`), where('status', '!=', 'paid'), orderBy('personName'));
     onSnapshot(payableQuery, snapshot => {
         const list = document.getElementById('payable-list-ul'); list.innerHTML = '';
-        snapshot.forEach(doc => { list.innerHTML += `<li data-id="${doc.id}" data-type="payables"><span><strong>${doc.data().personName}</strong> - দিতে হবে: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`; });
+        snapshot.forEach(doc => {
+            list.innerHTML += `<li data-id="${doc.id}" data-type="payables"><span><strong>${doc.data().personName}</strong> - দিতে হবে: ৳${doc.data().remainingAmount.toFixed(2)}</span><button class="view-due-btn">বিস্তারিত</button></li>`;
+        });
     });
 }
 
@@ -266,6 +281,7 @@ function setupModalEventListeners(listId) {
         currentOpenEntryId = listItem.dataset.id;
         currentOpenEntryType = listItem.dataset.type;
         const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
+        
         onSnapshot(entryRef, d => {
             if (!d.exists()) { modal.style.display = 'none'; return; }
             const data = d.data();
@@ -350,7 +366,6 @@ mainApp.addEventListener('click', async (e) => {
                 t.update(balanceRef, bData);
                 t.delete(transRef);
             });
-            await fetchAllTransactionsOnce();
             await takeDailySnapshot();
             loadTransactionsAndReportForDate(datePicker.valueAsDate);
             renderMonthlyChart();
