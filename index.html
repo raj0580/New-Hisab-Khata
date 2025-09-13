@@ -1,132 +1,128 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>রাজিব এর ব্যবসার হিসাব PRIME</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2196F3">
-<link rel="stylesheet" href="style.css">
-<link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-<!-- Chart.js Library for Graphs -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>রাজিব এর ব্যবসার হিসাব PRIME</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2196F3">
+    <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <!-- Chart.js Library for Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-<div id="auth-container" class="container">
-<h2>লগইন করুন</h2>
-<input type="email" id="email" placeholder="ইমেইল">
-<input type="password" id="password" placeholder="পাসওয়ার্ড">
-<button id="login-btn">লগইন</button>
-<p>অ্যাকাউন্ট নেই? <a href="#" id="signup-link">সাইন আপ করুন</a></p>
-</div>
+    <div id="auth-container" class="container">
+        <h2>লগইন করুন</h2>
+        <input type="email" id="email" placeholder="ইমেইল">
+        <input type="password" id="password" placeholder="পাসওয়ার্ড">
+        <button id="login-btn">লগইন</button>
+        <p>অ্যাকাউন্ট নেই? <a href="#" id="signup-link">সাইন আপ করুন</a></p>
+    </div>
 
-<div id="app-container" style="display: none;">
-<div id="setup-screen" class="container" style="display: none;">
-<h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
-<p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন।</p>
-<input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
-<input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
-<button id="save-initial-balance">সেভ করুন</button>
-<button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান</button>
-</div>
+    <div id="app-container" style="display: none;">
+        <div id="setup-screen" class="container" style="display: none;">
+             <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
+             <p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন।</p>
+            <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
+            <input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
+            <button id="save-initial-balance">সেভ করুন</button>
+            <button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান</button>
+        </div>
 
-<div id="main-app" class="container" style="display: none;">
-<header class="main-header">
-<h1>রাজিব এর ব্যবসার হিসাব</h1>
-<button id="logout-btn">লগআউট</button>
-</header>
+        <div id="main-app" class="container" style="display: none;">
+            <header class="main-header">
+                <h1>রাজিব এর ব্যবসার হিসাব</h1>
+                <button id="logout-btn">লগআউট</button>
+            </header>
 
-<h2 class="section-title">ড্যাশবোর্ড</h2>
-<div id="dashboard">
-<div class="card"><h3 class="card-title">বর্তমান অনলাইন</h3><p id="online-balance">৳ 0.00</p></div>
-<div class="card"><h3 class="card-title">বর্তমান ক্যাশ</h3><p id="cash-balance">৳ 0.00</p></div>
-</div>
-<div class="card total-balance-card">
-<h3 class="card-title">মোট বর্তমান ব্যালেন্স</h3><p id="total-balance">৳ 0.00</p>
-</div>
-
-            <h2 class="section-title">মাসিক গ্রাফ</h2>
-            <div class="chart-container">
-                <canvas id="monthly-chart"></canvas>
+            <h2 class="section-title">ড্যাশবোর্ড</h2>
+            <div id="dashboard">
+                <div class="card"><h3 class="card-title">বর্তমান অনলাইন</h3><p id="online-balance">৳ 0.00</p></div>
+                <div class="card"><h3 class="card-title">বর্তমান ক্যাশ</h3><p id="cash-balance">৳ 0.00</p></div>
+            </div>
+            <div class="card total-balance-card">
+                <h3 class="card-title">মোট বর্তমান ব্যালেন্স</h3><p id="total-balance">৳ 0.00</p>
+            </div>
+            
             <h2 class="section-title">মাসিক গ্রাফ (স্ক্রল করুন)</h2>
             <div class="chart-container-wrapper">
                 <div class="chart-container">
                     <canvas id="monthly-chart"></canvas>
                 </div>
-</div>
+            </div>
 
-<h2 class="section-title">দৈনিক রিপোর্ট</h2>
-<div id="date-filter">
-<label for="date-picker">দিন দেখুন:</label>
-<input type="date" id="date-picker">
-</div>
-<div id="daily-report" class="daily-summary-grid">
-<div class="summary-item"><span>শুরুর ব্যালেন্স:</span> <strong id="opening-balance">৳0.00</strong></div>
-<div class="summary-item"><span>দিনের আয়:</span> <strong id="daily-income" class="income-color">৳0.00</strong></div>
-<div class="summary-item"><span>দিনের ব্যয়:</span> <strong id="daily-expense" class="expense-color">৳0.00</strong></div>
-<div class="summary-item"><span>লাভ/ক্ষতি:</span> <strong id="profit-loss">৳0.00</strong></div>
-<div class="summary-item closing-balance-item"><span>শেষের ব্যালেন্স:</span> <strong id="closing-balance">৳0.00</strong></div>
-</div>
+            <h2 class="section-title">দৈনিক রিপোর্ট</h2>
+            <div id="date-filter">
+                <label for="date-picker">দিন দেখুন:</label>
+                <input type="date" id="date-picker">
+            </div>
+            <div id="daily-report" class="daily-summary-grid">
+                <div class="summary-item"><span>শুরুর ব্যালেন্স:</span> <strong id="opening-balance">৳0.00</strong></div>
+                <div class="summary-item"><span>দিনের আয়:</span> <strong id="daily-income" class="income-color">৳0.00</strong></div>
+                <div class="summary-item"><span>দিনের ব্যয়:</span> <strong id="daily-expense" class="expense-color">৳0.00</strong></div>
+                <div class="summary-item"><span>লাভ/ক্ষতি:</span> <strong id="profit-loss">৳0.00</strong></div>
+                <div class="summary-item closing-balance-item"><span>শেষের ব্যালেন্স:</span> <strong id="closing-balance">৳0.00</strong></div>
+            </div>
+            
+            <h2 class="section-title">নতুন এন্ট্রি</h2>
+            <form id="transaction-form">
+                <select id="category">
+                    <option value="online-income">অনলাইন আয়</option><option value="cash-income">ক্যাশ আয়</option>
+                    <option value="online-expense">অনলাইন খরচ</option><option value="cash-expense">ক্যাশ খরচ</option>
+                    <option value="due">ডিউ (বাকি)</option>
+                    <option value="payable">পাওনা (ধার)</option>
+                </select>
+                <input type="number" id="amount" placeholder="পরিমাণ (৳)">
+                <input type="text" id="description" placeholder="বর্ণনা / আইটেম">
+                <input type="text" id="person-name" placeholder="কাস্টমার / পাওনাদারের নাম" style="display: none;">
+                <button type="button" id="add-transaction-btn">যোগ করুন</button>
+            </form>
 
-<h2 class="section-title">নতুন এন্ট্রি</h2>
-<form id="transaction-form">
-<select id="category">
-<option value="online-income">অনলাইন আয়</option><option value="cash-income">ক্যাশ আয়</option>
-<option value="online-expense">অনলাইন খরচ</option><option value="cash-expense">ক্যাশ খরচ</option>
-<option value="due">ডিউ (বাকি)</option>
-<option value="payable">পাওনা (ধার)</option>
-</select>
-<input type="number" id="amount" placeholder="পরিমাণ (৳)">
-<input type="text" id="description" placeholder="বর্ণনা / আইটেম">
-<input type="text" id="person-name" placeholder="কাস্টমার / পাওনাদারের নাম" style="display: none;">
-<button type="button" id="add-transaction-btn">যোগ করুন</button>
-</form>
+            <div class="tabs">
+                <button class="tab-link active" onclick="openTab(event, 'transactions-tab')">দৈনিক লেনদেন</button>
+                <button class="tab-link" onclick="openTab(event, 'dues-tab')">ডিউ তালিকা</button>
+                <button class="tab-link" onclick="openTab(event, 'payables-tab')">পাওনা তালিকা</button>
+            </div>
+            <div id="transactions-tab" class="tab-content active"><ul id="transactions-list-ul"></ul></div>
+            <div id="dues-tab" class="tab-content"><ul id="due-list-ul"></ul></div>
+            <div id="payables-tab" class="tab-content"><ul id="payable-list-ul"></ul></div>
+        </div>
+    </div>
+    
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2 id="modal-person-name"></h2><span class="close-btn">&times;</span></div>
+            <div id="modal-body">
+                <div class="due-summary">
+                    <div><strong>মোট:</strong> <span id="modal-total"></span></div>
+                    <div><strong>পরিশোধ:</strong> <span id="modal-paid"></span></div>
+                    <div><strong>বাকি:</strong> <span id="modal-remaining"></span></div>
+                </div>
+                <h3>আইটেম/কারণ</h3><ul id="modal-item-list"></ul>
+                <div class="add-new-item-form">
+                    <h4>নতুন আইটেম/কারণ যোগ করুন</h4>
+                    <input type="text" id="new-item-name" placeholder="আইটেমের নাম"><input type="number" id="new-item-amount" placeholder="দাম (৳)">
+                    <button id="add-item-btn">যোগ করুন</button>
+                </div>
+                <h3>পেমেন্ট/পরিশোধ ইতিহাস</h3><ul id="modal-payment-history"></ul>
+                <div class="add-new-payment-form">
+                    <h4>নতুন পেমেন্ট/পরিশোধ করুন</h4>
+                    <input type="number" id="new-payment-amount" placeholder="পরিমাণ">
+                    <button id="add-payment-btn">পরিশোধ করুন</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="tabs">
-<button class="tab-link active" onclick="openTab(event, 'transactions-tab')">দৈনিক লেনদেন</button>
-<button class="tab-link" onclick="openTab(event, 'dues-tab')">ডিউ তালিকা</button>
-<button class="tab-link" onclick="openTab(event, 'payables-tab')">পাওনা তালিকা</button>
-</div>
-<div id="transactions-tab" class="tab-content active"><ul id="transactions-list-ul"></ul></div>
-<div id="dues-tab" class="tab-content"><ul id="due-list-ul"></ul></div>
-<div id="payables-tab" class="tab-content"><ul id="payable-list-ul"></ul></div>
-</div>
-</div>
-
-<div id="details-modal" class="modal">
-<div class="modal-content">
-<div class="modal-header"><h2 id="modal-person-name"></h2><span class="close-btn">&times;</span></div>
-<div id="modal-body">
-<div class="due-summary">
-<div><strong>মোট:</strong> <span id="modal-total"></span></div>
-<div><strong>পরিশোধ:</strong> <span id="modal-paid"></span></div>
-<div><strong>বাকি:</strong> <span id="modal-remaining"></span></div>
-</div>
-<h3>আইটেম/কারণ</h3><ul id="modal-item-list"></ul>
-<div class="add-new-item-form">
-<h4>নতুন আইটেম/কারণ যোগ করুন</h4>
-<input type="text" id="new-item-name" placeholder="আইটেমের নাম"><input type="number" id="new-item-amount" placeholder="দাম (৳)">
-<button id="add-item-btn">যোগ করুন</button>
-</div>
-<h3>পেমেন্ট/পরিশোধ ইতিহাস</h3><ul id="modal-payment-history"></ul>
-<div class="add-new-payment-form">
-<h4>নতুন পেমেন্ট/পরিশোধ করুন</h4>
-<input type="number" id="new-payment-amount" placeholder="পরিমাণ">
-<button id="add-payment-btn">পরিশোধ করুন</button>
-</div>
-</div>
-</div>
-</div>
-
-<script type="module" src="app.js"></script>
-<script>
-function openTab(evt, tabName) {
-document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
-document.querySelectorAll(".tab-link").forEach(link => link.classList.remove("active"));
-document.getElementById(tabName).style.display = "block";
-evt.currentTarget.classList.add("active");
-}
-</script>
+    <script type="module" src="app.js"></script>
+    <script>
+        function openTab(evt, tabName) {
+            document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+            document.querySelectorAll(".tab-link").forEach(link => link.classList.remove("active"));
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.classList.add("active");
+        }
+    </script>
 </body>
-                                                                      </html>
 </html>
