@@ -12,7 +12,7 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal');
-let currentUser, currentOpenEntryId, currentOpenEntryType, weeklyChart, hasCheckedBalance = false;
+let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false;
 window.chartInstances = [];
 
 // Auth State Logic
@@ -22,10 +22,7 @@ onAuthStateChanged(auth, user => {
 });
 loginBtn.addEventListener('click', () => signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)));
 signupLink.addEventListener('click', e => { e.preventDefault(); createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)); });
-logoutBtn.addEventListener('click', async () => {
-    await takeDailySnapshot(); 
-    signOut(auth);
-});
+logoutBtn.addEventListener('click', async () => { await takeDailySnapshot(); signOut(auth); });
 
 async function checkInitialBalance() {
     if (!currentUser || hasCheckedBalance) return;
@@ -33,6 +30,7 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -41,7 +39,21 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-        balanceSnap.exists() ? showMainApp() : (setupScreen.style.display = 'block', mainApp.style.display = 'none');
+
+        if (balanceSnap.exists()) {
+            showMainApp();
+        } else {
+            // Fetch balance if it exists but wasn't set up yet.
+            const initialOnlineInput = document.getElementById('initial-online-balance');
+            const initialCashInput = document.getElementById('initial-cash-balance');
+            const currentData = balanceSnap.data();
+            if(currentData){
+                initialOnlineInput.value = currentData.online || 0;
+                initialCashInput.value = currentData.cash || 0;
+            }
+            setupScreen.style.display = 'block';
+            mainApp.style.display = 'none';
+        }
     } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
 
@@ -61,7 +73,13 @@ const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
-    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash });
+    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
+    const balanceSnap = await getDoc(balanceRef);
+    if (balanceSnap.exists()){
+        await updateDoc(balanceRef, { online, cash });
+    } else {
+        await setDoc(balanceRef, { online, cash, initialOnline: online, initialCash: cash });
+    }
     await takeDailySnapshot(new Date(), { online, cash });
     showMainApp();
 });
@@ -76,7 +94,6 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
-
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -91,7 +108,6 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
-
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -169,12 +185,10 @@ async function loadTransactionsAndReportForDate(selectedDate) {
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
     const yAxisCanvasLeft = document.getElementById('y-axis-chart-left');
-    const yAxisCanvasRight = document.getElementById('y-axis-chart-right');
-    if (!mainCanvas || !yAxisCanvasLeft || !yAxisCanvasRight) return;
+    if (!mainCanvas || !yAxisCanvasLeft) return;
 
     const mainCtx = mainCanvas.getContext('2d');
     const yAxisCtxLeft = yAxisCanvasLeft.getContext('2d');
-    const yAxisCtxRight = yAxisCanvasRight.getContext('2d');
 
     if (window.chartInstances) {
         window.chartInstances.forEach(instance => instance.destroy());
@@ -212,7 +226,6 @@ async function renderMonthlyChart() {
     };
     
     const yAxisChartLeft = new Chart(yAxisCtxLeft, { type: 'line', data: chartData, options: yAxisOptions });
-    const yAxisChartRight = new Chart(yAxisCtxRight, { type: 'line', data: chartData, options: yAxisOptions });
     const mainChart = new Chart(mainCtx, {
         type: 'line',
         data: chartData,
@@ -223,7 +236,7 @@ async function renderMonthlyChart() {
         }
     });
 
-    window.chartInstances = [mainChart, yAxisChartLeft, yAxisChartRight];
+    window.chartInstances = [mainChart, yAxisChartLeft];
 
     const chartWrapper = document.querySelector('.chart-container-wrapper');
     if (chartWrapper) {
@@ -294,10 +307,7 @@ function loadAllDuesAndPayables() {
             const list = document.getElementById(listId); list.innerHTML = '';
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const phoneButtons = data.phoneNumber ? `
-                    <button class="whatsapp-btn" title="Send WhatsApp Message">💬</button>
-                    <button class="sms-btn" title="Send SMS">✉️</button>
-                ` : '';
+                const phoneButtons = data.phoneNumber ? `<button class="whatsapp-btn" title="Send WhatsApp Message">💬</button><button class="sms-btn" title="Send SMS">✉️</button>` : '';
                 list.innerHTML += `<li data-id="${doc.id}" data-type="${collectionName}" data-phone="${data.phoneNumber || ''}" data-name="${data[nameField]}" data-amount="${data.remainingAmount}">
                         <div class="list-item-info"><strong>${data[nameField]}</strong><br><small>${collectionName === 'dues' ? 'বাকি' : 'দিতে হবে'}: ৳${data.remainingAmount.toFixed(2)}</small></div>
                         <div class="list-item-actions">${phoneButtons}<button class="view-due-btn">বিস্তারিত</button></div>
@@ -310,7 +320,7 @@ function loadAllDuesAndPayables() {
 }
 
 function setupMessagingListeners(listId) {
-    document.getElementById(listId).addEventListener('click', e => {
+    document.getElementById(listId).addEventListener('click', async e => {
         const button = e.target.closest('button');
         if (!button || (!button.classList.contains('whatsapp-btn') && !button.classList.contains('sms-btn'))) return;
         
@@ -318,18 +328,32 @@ function setupMessagingListeners(listId) {
         let phone = listItem.dataset.phone;
         const name = listItem.dataset.name;
         const amount = listItem.dataset.amount;
+        const entryId = listItem.dataset.id;
+        const entryType = listItem.dataset.type;
 
         if (!phone) return alert("এই ব্যক্তির জন্য কোনো ফোন নম্বর সেভ করা নেই।");
         
         phone = phone.replace(/[^0-9+]/g, '');
-        if (phone.startsWith('+')) {
-            phone = phone.replace(/\s/g, '');
-        } else {
-            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone}`; }
-            else if (phone.length === 10) { phone = `91${phone}`; } // Default to India for 10-digit
+        if (phone.startsWith('+')) { phone = phone.replace(/\s/g, ''); }
+        else {
+            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone.substring(1)}`; } // Bangladesh
+            else if (phone.length === 10) { phone = `91${phone}`; } // India
         }
         
-        const message = `নমস্কার ${name},\nআপনার মোট বকেয়া ৳${amount}।\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
+        const entryRef = doc(db, `users/${currentUser.uid}/${entryType}/${entryId}`);
+        const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
+        const itemsSnap = await getDocs(itemsQuery);
+        
+        let itemsList = itemsSnap.docs.map(doc => {
+            const item = doc.data();
+            return `${item.name} - ৳${item.amount}`;
+        }).join('\n');
+        
+        const entrySnap = await getDoc(entryRef);
+        const totalAmount = entrySnap.data().totalAmount;
+        const paidAmount = entrySnap.data().paidAmount;
+
+        const message = `নমস্কার ${name},\n\nআপনার হিসাবের বিবরণ:\n${itemsList}\n--------------------\nমোট: ৳${totalAmount}\nজমা: ৳${paidAmount}\n--------------------\nবাকি: ৳${amount}\n\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
         const encodedMessage = encodeURIComponent(message);
         
         if (button.classList.contains('whatsapp-btn')) {
@@ -415,14 +439,11 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button');
     if (!button || !button.classList.contains('delete-btn')) return;
-
     const listItem = button.closest('li');
     if(!listItem) return;
-
     const id = listItem.dataset.id; 
     const type = listItem.dataset.type;
     if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
-
     if (type === 'transaction') {
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
