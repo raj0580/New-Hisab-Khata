@@ -34,16 +34,15 @@ body { font-family: 'Hind Siliguri', sans-serif; background-color: var(--backgro
     border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 10px;
 }
 .chart-y-axis { width: 50px; flex-shrink: 0; position: relative; height: 250px; }
-.chart-y-axis.right { order: 3; }
 .chart-container-wrapper {
-    overflow-x: auto; -webkit-overflow-scrolling: touch; flex-grow: 1; order: 2;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; flex-grow: 1;
     scrollbar-width: thin; scrollbar-color: var(--primary-blue) var(--border-color);
 }
 .chart-container-wrapper::-webkit-scrollbar { height: 8px; }
 .chart-container-wrapper::-webkit-scrollbar-track { background: var(--border-color); }
 .chart-container-wrapper::-webkit-scrollbar-thumb { background-color: var(--primary-blue); border-radius: 10px; }
 .chart-container { position: relative; width: 1200px; height: 250px; }
-#y-axis-chart-left, #y-axis-chart-right { position: absolute; top: 0; left: 0; height: 100% !important; width: 100% !important; }
+#y-axis-chart-left { position: absolute; top: 0; left: 0; height: 100% !important; width: 100% !important; }
 
 #daily-report { background-color: var(--card-bg); padding: 15px; border-radius: 12px; margin-top: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
 .daily-summary-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
