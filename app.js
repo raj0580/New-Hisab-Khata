@@ -30,7 +30,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -39,18 +38,13 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-
         if (balanceSnap.exists()) {
             showMainApp();
         } else {
-            // Fetch balance if it exists but wasn't set up yet.
             const initialOnlineInput = document.getElementById('initial-online-balance');
             const initialCashInput = document.getElementById('initial-cash-balance');
-            const currentData = balanceSnap.data();
-            if(currentData){
-                initialOnlineInput.value = currentData.online || 0;
-                initialCashInput.value = currentData.cash || 0;
-            }
+            initialOnlineInput.value = '';
+            initialCashInput.value = '';
             setupScreen.style.display = 'block';
             mainApp.style.display = 'none';
         }
@@ -73,13 +67,7 @@ const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
-    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceSnap = await getDoc(balanceRef);
-    if (balanceSnap.exists()){
-        await updateDoc(balanceRef, { online, cash });
-    } else {
-        await setDoc(balanceRef, { online, cash, initialOnline: online, initialCash: cash });
-    }
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash });
     await takeDailySnapshot(new Date(), { online, cash });
     showMainApp();
 });
@@ -94,6 +82,7 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
+
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -108,6 +97,7 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
+
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -182,6 +172,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     }
 }
 
+// *** CRITICAL UPDATE: Renders chart with CORRECT Y-Axis ***
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
     const yAxisCanvasLeft = document.getElementById('y-axis-chart-left');
@@ -218,21 +209,50 @@ async function renderMonthlyChart() {
         ]
     };
 
+    // Calculate nice tick values for the Y-Axis
+    const allData = onlineData.concat(cashData).filter(v => v !== null);
+    const maxVal = allData.length > 0 ? Math.max(...allData) : 1000;
     const yAxisOptions = {
         responsive: true, maintainAspectRatio: false,
-        scales: { y: { display: true, beginAtZero: false, ticks: { padding: 10 } }, x: { display: false } },
+        scales: { 
+            y: { 
+                display: true, 
+                beginAtZero: true, 
+                max: Math.ceil(maxVal / 1000) * 1000 + 5000, // Make it a bit taller
+                ticks: { 
+                    padding: 10,
+                    // Format ticks to be more readable (e.g., 5k, 10k)
+                    callback: function(value, index, values) {
+                        if (value >= 1000) {
+                            return (value / 1000) + 'k';
+                        }
+                        return value;
+                    }
+                } 
+            }, 
+            x: { display: false } 
+        },
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         elements: { point: { radius: 0 }, line: { borderWidth: 0 } }
     };
     
+    // Create Left Y-Axis Chart
     const yAxisChartLeft = new Chart(yAxisCtxLeft, { type: 'line', data: chartData, options: yAxisOptions });
+    
+    // Create Main Chart
     const mainChart = new Chart(mainCtx, {
         type: 'line',
         data: chartData,
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { y: { display: false }, x: { grid: { display: true }, ticks: { autoSkip: false } } },
-            plugins: { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 20, padding: 20 } }, tooltip: { mode: 'index', intersect: false } }
+            scales: { 
+                y: { display: false, max: yAxisOptions.scales.y.max }, // Use same max value
+                x: { grid: { display: true }, ticks: { autoSkip: false } } 
+            },
+            plugins: { 
+                legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 20, padding: 20 } }, 
+                tooltip: { mode: 'index', intersect: false } 
+            }
         }
     });
 
@@ -243,6 +263,7 @@ async function renderMonthlyChart() {
         chartWrapper.scrollLeft = chartWrapper.scrollWidth;
     }
 }
+
 
 categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
 
@@ -336,8 +357,8 @@ function setupMessagingListeners(listId) {
         phone = phone.replace(/[^0-9+]/g, '');
         if (phone.startsWith('+')) { phone = phone.replace(/\s/g, ''); }
         else {
-            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone.substring(1)}`; } // Bangladesh
-            else if (phone.length === 10) { phone = `91${phone}`; } // India
+            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone.substring(1)}`; }
+            else if (phone.length === 10) { phone = `91${phone}`; }
         }
         
         const entryRef = doc(db, `users/${currentUser.uid}/${entryType}/${entryId}`);
