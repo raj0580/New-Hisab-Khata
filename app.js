@@ -30,6 +30,7 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -38,13 +39,12 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
+
         if (balanceSnap.exists()) {
             showMainApp();
         } else {
-            const initialOnlineInput = document.getElementById('initial-online-balance');
-            const initialCashInput = document.getElementById('initial-cash-balance');
-            initialOnlineInput.value = '';
-            initialCashInput.value = '';
+            document.getElementById('initial-online-balance').value = '';
+            document.getElementById('initial-cash-balance').value = '';
             setupScreen.style.display = 'block';
             mainApp.style.display = 'none';
         }
@@ -172,7 +172,6 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     }
 }
 
-// *** CRITICAL UPDATE: Renders chart with CORRECT Y-Axis ***
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
     const yAxisCanvasLeft = document.getElementById('y-axis-chart-left');
@@ -209,23 +208,21 @@ async function renderMonthlyChart() {
         ]
     };
 
-    // Calculate nice tick values for the Y-Axis
     const allData = onlineData.concat(cashData).filter(v => v !== null);
     const maxVal = allData.length > 0 ? Math.max(...allData) : 1000;
+    const yAxisMax = Math.ceil((maxVal + maxVal * 0.1) / 1000) * 1000;
+
     const yAxisOptions = {
         responsive: true, maintainAspectRatio: false,
         scales: { 
             y: { 
                 display: true, 
                 beginAtZero: true, 
-                max: Math.ceil(maxVal / 1000) * 1000 + 5000, // Make it a bit taller
+                max: yAxisMax,
                 ticks: { 
                     padding: 10,
-                    // Format ticks to be more readable (e.g., 5k, 10k)
-                    callback: function(value, index, values) {
-                        if (value >= 1000) {
-                            return (value / 1000) + 'k';
-                        }
+                    callback: function(value) {
+                        if (value >= 1000) return (value / 1000) + 'k';
                         return value;
                     }
                 } 
@@ -236,34 +233,22 @@ async function renderMonthlyChart() {
         elements: { point: { radius: 0 }, line: { borderWidth: 0 } }
     };
     
-    // Create Left Y-Axis Chart
     const yAxisChartLeft = new Chart(yAxisCtxLeft, { type: 'line', data: chartData, options: yAxisOptions });
-    
-    // Create Main Chart
     const mainChart = new Chart(mainCtx, {
-        type: 'line',
-        data: chartData,
+        type: 'line', data: chartData,
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { 
-                y: { display: false, max: yAxisOptions.scales.y.max }, // Use same max value
-                x: { grid: { display: true }, ticks: { autoSkip: false } } 
-            },
-            plugins: { 
-                legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 20, padding: 20 } }, 
-                tooltip: { mode: 'index', intersect: false } 
-            }
+            scales: { y: { display: false, max: yAxisMax }, x: { grid: { display: true }, ticks: { autoSkip: false } } },
+            plugins: { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 20, padding: 20 } }, tooltip: { mode: 'index', intersect: false } }
         }
     });
 
     window.chartInstances = [mainChart, yAxisChartLeft];
-
     const chartWrapper = document.querySelector('.chart-container-wrapper');
     if (chartWrapper) {
         chartWrapper.scrollLeft = chartWrapper.scrollWidth;
     }
 }
-
 
 categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
 
@@ -454,6 +439,7 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
             transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
         });
         document.getElementById('new-payment-amount').value = '';
+        modal.style.display = 'none';
     } catch (e) { alert(e.message); }
 });
 
