@@ -46,9 +46,14 @@
             
             <h2 class="section-title">মাসিক গ্রাফ (স্ক্রল করুন)</h2>
             <div class="split-chart-container">
-                <div class="chart-y-axis left"><canvas id="y-axis-chart-left"></canvas></div>
-                <div class="chart-container-wrapper"><div class="chart-container"><canvas id="monthly-chart"></canvas></div></div>
-                <div class="chart-y-axis right"><canvas id="y-axis-chart-right"></canvas></div>
+                <div class="chart-y-axis left">
+                    <canvas id="y-axis-chart-left"></canvas>
+                </div>
+                <div class="chart-container-wrapper">
+                    <div class="chart-container">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <h2 class="section-title">দৈনিক রিপোর্ট</h2>
@@ -73,7 +78,7 @@
                 <input type="text" id="description" placeholder="বর্ণনা / আইটেম">
                 <div id="person-details" style="display: none;">
                     <input type="text" id="person-name" placeholder="কাস্টমার / পাওনাদারের নাম">
-                    <input type="tel" id="person-phone" placeholder="ফোন নম্বর (e.g., 88017...)">
+                    <input type="tel" id="person-phone" placeholder="ফোন নম্বর (e.g., +91987...)">
                 </div>
                 <button type="button" id="add-transaction-btn">যোগ করুন</button>
             </form>
