@@ -12,7 +12,7 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal');
-let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false;
+let currentUser, currentOpenEntryId, currentOpenEntryType, weeklyChart, hasCheckedBalance = false;
 window.chartInstances = [];
 
 // Auth State Logic
@@ -119,7 +119,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
             const t = doc.data();
             if (t.type === 'income') dailyIncome += t.amount;
             if (t.type === 'expense') dailyExpense += t.amount;
-            list.innerHTML += `<li><div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div> <div class="list-item-actions"><button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></div></li>`;
+            list.innerHTML += `<li><div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div><div class="list-item-actions"><button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></div></li>`;
         });
         document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
         document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
@@ -294,7 +294,10 @@ function loadAllDuesAndPayables() {
             const list = document.getElementById(listId); list.innerHTML = '';
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const phoneButtons = data.phoneNumber ? `<button class="whatsapp-btn" title="Send WhatsApp Message">💬</button><button class="sms-btn" title="Send SMS">✉️</button>` : '';
+                const phoneButtons = data.phoneNumber ? `
+                    <button class="whatsapp-btn" title="Send WhatsApp Message">💬</button>
+                    <button class="sms-btn" title="Send SMS">✉️</button>
+                ` : '';
                 list.innerHTML += `<li data-id="${doc.id}" data-type="${collectionName}" data-phone="${data.phoneNumber || ''}" data-name="${data[nameField]}" data-amount="${data.remainingAmount}">
                         <div class="list-item-info"><strong>${data[nameField]}</strong><br><small>${collectionName === 'dues' ? 'বাকি' : 'দিতে হবে'}: ৳${data.remainingAmount.toFixed(2)}</small></div>
                         <div class="list-item-actions">${phoneButtons}<button class="view-due-btn">বিস্তারিত</button></div>
@@ -318,11 +321,15 @@ function setupMessagingListeners(listId) {
 
         if (!phone) return alert("এই ব্যক্তির জন্য কোনো ফোন নম্বর সেভ করা নেই।");
         
-        phone = phone.replace(/[^0-9]/g, '');
-        if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone}`; }
-        else if (phone.length === 10) { phone = `880${phone}`; }
+        phone = phone.replace(/[^0-9+]/g, '');
+        if (phone.startsWith('+')) {
+            phone = phone.replace(/\s/g, '');
+        } else {
+            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone}`; }
+            else if (phone.length === 10) { phone = `91${phone}`; } // Default to India for 10-digit
+        }
         
-        const message = `নমস্কার ${name}, আপনার মোট বকেয়া ৳${amount}। অনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল। ধন্যবাদ।`;
+        const message = `নমস্কার ${name},\nআপনার মোট বকেয়া ৳${amount}।\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
         const encodedMessage = encodeURIComponent(message);
         
         if (button.classList.contains('whatsapp-btn')) {
@@ -406,8 +413,10 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 });
 
 mainApp.addEventListener('click', async (e) => {
-    if (!e.target.classList.contains('delete-btn')) return;
-    const listItem = e.target.closest('li');
+    const button = e.target.closest('button');
+    if (!button || !button.classList.contains('delete-btn')) return;
+
+    const listItem = button.closest('li');
     if(!listItem) return;
 
     const id = listItem.dataset.id; 
