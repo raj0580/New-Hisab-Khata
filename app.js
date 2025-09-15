@@ -90,10 +90,95 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
-async function takeDailySnapshot(date = new Date(), forceBalance) { /* ... same as before ... */ }
+
+async function takeDailySnapshot(date = new Date(), forceBalance) {
+    if (!currentUser) return;
+    const dateId = getDateId(date);
+    const snapshotRef = doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`);
+    let closingBalance = forceBalance;
+    if (!closingBalance) {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        closingBalance = balanceDoc.exists() ? balanceDoc.data() : { online: 0, cash: 0 };
+    }
+    await setDoc(snapshotRef, { closingOnline: closingBalance.online, closingCash: closingBalance.cash, timestamp: serverTimestamp() });
+    localStorage.setItem(`lastSnapshot_${currentUser.uid}`, dateId);
+}
+
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
-function loadDashboardData() { /* ... same as before ... */ }
-async function loadTransactionsAndReportForDate(selectedDate) { /* ... same as before ... */ }
+
+function loadDashboardData() {
+    const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
+    onSnapshot(balanceRef, (doc) => {
+        if (!doc.exists()) {
+            ['online-balance', 'cash-balance', 'total-balance'].forEach(id => document.getElementById(id).textContent = '৳0.00');
+            return;
+        };
+        const data = doc.data();
+        document.getElementById('online-balance').textContent = `৳${data.online.toFixed(2)}`;
+        document.getElementById('cash-balance').textContent = `৳${data.cash.toFixed(2)}`;
+        document.getElementById('total-balance').textContent = `৳${(data.online + data.cash).toFixed(2)}`;
+    });
+}
+
+async function loadTransactionsAndReportForDate(selectedDate) {
+    if (!currentUser) return;
+    const startOfDay = new Date(selectedDate); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate); endOfDay.setHours(23, 59, 59, 999);
+    
+    const todayTransQuery = query(collection(db, `users/${currentUser.uid}/transactions`), where('timestamp', '>=', startOfDay), where('timestamp', '<=', endOfDay), orderBy('timestamp', 'desc'));
+    onSnapshot(todayTransQuery, snapshot => {
+        let dailyIncome = 0, dailyExpense = 0;
+        const list = document.getElementById('transactions-list-ul'); list.innerHTML = '';
+        snapshot.forEach(doc => {
+            const t = doc.data();
+            if (t.type === 'income') dailyIncome += t.amount;
+            if (t.type === 'expense') dailyExpense += t.amount;
+            list.innerHTML += `<li><div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div><div class="list-item-actions"><button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></div></li>`;
+        });
+        document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
+        document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
+        const profitLoss = dailyIncome - dailyExpense;
+        const profitLossEl = document.getElementById('profit-loss');
+        profitLossEl.textContent = `৳${profitLoss.toFixed(2)}`;
+        profitLossEl.style.color = profitLoss >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    });
+
+    const previousDay = new Date(selectedDate);
+    previousDay.setDate(previousDay.getDate() - 1);
+    const prevDayId = getDateId(previousDay);
+    const prevDaySnapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${prevDayId}`));
+
+    let openingOnline = 0, openingCash = 0;
+    if (prevDaySnapshotDoc.exists()) {
+        openingOnline = prevDaySnapshotDoc.data().closingOnline;
+        openingCash = prevDaySnapshotDoc.data().closingCash;
+    } else {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        if(balanceDoc.exists()) {
+            openingOnline = balanceDoc.data().initialOnline || 0;
+            openingCash = balanceDoc.data().initialCash || 0;
+        }
+    }
+    document.getElementById('opening-balance').textContent = `৳${(openingOnline + openingCash).toFixed(2)}`;
+
+    const todayId = getDateId(new Date());
+    const selectedId = getDateId(selectedDate);
+    if (todayId === selectedId) {
+        const balanceDoc = await getDoc(doc(db, `users/${currentUser.uid}/balance/main`));
+        if (balanceDoc.exists()) {
+            const current = balanceDoc.data();
+            document.getElementById('closing-balance').textContent = `অনলাইন: ৳${current.online.toFixed(2)} | ক্যাশ: ৳${current.cash.toFixed(2)}`;
+        }
+    } else {
+        const selectedSnapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${selectedId}`));
+        if (selectedSnapshotDoc.exists()) {
+            const snapshotData = selectedSnapshotDoc.data();
+            document.getElementById('closing-balance').textContent = `অনলাইন: ৳${snapshotData.closingOnline.toFixed(2)} | ক্যাশ: ৳${snapshotData.closingCash.toFixed(2)}`;
+        } else {
+            document.getElementById('closing-balance').textContent = 'হিসাব নেই';
+        }
+    }
+}
 
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
@@ -103,11 +188,14 @@ async function renderMonthlyChart() {
     const mainCtx = mainCanvas.getContext('2d');
     const yAxisCtxLeft = yAxisCanvasLeft.getContext('2d');
 
-    if (window.chartInstances) { window.chartInstances.forEach(instance => instance.destroy()); }
+    if (window.chartInstances) {
+        window.chartInstances.forEach(instance => instance.destroy());
+    }
     
     const labels = [], onlineData = [], cashData = [];
     for (let i = 29; i >= 0; i--) {
-        const d = new Date(); d.setDate(d.getDate() - i);
+        const d = new Date();
+        d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}));
         const dateId = getDateId(d);
         const snapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`));
@@ -135,7 +223,18 @@ async function renderMonthlyChart() {
     const yAxisOptions = {
         responsive: true, maintainAspectRatio: false,
         scales: { 
-            y: { display: true, beginAtZero: true, max: yAxisMax, ticks: { padding: 10, callback: function(value) { if (value >= 1000) return (value / 1000) + 'k'; return value; } } }, 
+            y: { 
+                display: true, 
+                beginAtZero: true, 
+                max: yAxisMax,
+                ticks: { 
+                    padding: 10,
+                    callback: function(value) {
+                        if (value >= 1000) return (value / 1000) + 'k';
+                        return value;
+                    }
+                } 
+            }, 
             x: { display: false } 
         },
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
@@ -154,16 +253,130 @@ async function renderMonthlyChart() {
 
     window.chartInstances = [mainChart, yAxisChartLeft];
     const chartWrapper = document.querySelector('.chart-container-wrapper');
-    if (chartWrapper) { chartWrapper.scrollLeft = chartWrapper.scrollWidth; }
+    if (chartWrapper) {
+        chartWrapper.scrollLeft = chartWrapper.scrollWidth;
+    }
 }
 
 categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
 
-document.getElementById('add-transaction-btn').addEventListener('click', async () => { /* ... same as before ... */ });
+document.getElementById('add-transaction-btn').addEventListener('click', async () => {
+    const category = categorySelect.value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const description = document.getElementById('description').value;
+    const person = personNameInput.value;
+    const phone = personPhoneInput.value;
+    if (!amount || amount <= 0) return alert('সঠিক পরিমাণ দিন।');
+    
+    const isDueOrPayable = ['due', 'payable'].includes(category);
+    if(isDueOrPayable && !person) return alert('ব্যক্তির নাম দিন।');
+    
+    if (isDueOrPayable) {
+        const collectionName = category === 'due' ? 'dues' : 'payables';
+        const nameField = category === 'due' ? 'customerName' : 'personName';
+        const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', '!=', 'paid'));
+        const existingEntrySnap = await getDocs(q);
+        let entryRef = existingEntrySnap.empty ? doc(collection(db, `users/${currentUser.uid}/${collectionName}`)) : existingEntrySnap.docs[0].ref;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const docSnap = await transaction.get(entryRef);
+                const data = { name: description || 'N/A', amount, date: serverTimestamp() };
+                if (!docSnap.exists()) {
+                    const newEntry = { status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone };
+                    newEntry[nameField] = person;
+                    transaction.set(entryRef, newEntry);
+                } else {
+                    const newTotal = docSnap.data().totalAmount + amount;
+                    const newRemaining = docSnap.data().remainingAmount + amount;
+                    const updateData = { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() };
+                    if (phone) updateData.phoneNumber = phone;
+                    transaction.update(entryRef, updateData);
+                }
+                transaction.set(doc(collection(entryRef, 'items')), data);
+            });
+        } catch (e) { console.error("Transaction failed: ", e); alert("এন্ট্রি যোগ করতে সমস্যা হয়েছে। Firebase Index তৈরি করেছেন কি?"); }
+    } else {
+        await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
+        const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
+        await runTransaction(db, async (t) => {
+            const balanceDoc = await t.get(balanceRef);
+            if (!balanceDoc.exists()) throw "Balance doc not found";
+            const b = balanceDoc.data();
+            if (category === 'online-income') b.online += amount; else if (category === 'cash-income') b.cash += amount;
+            else if (category === 'online-expense') b.online -= amount; else if (category === 'cash-expense') b.cash -= amount;
+            t.update(balanceRef, b);
+        });
+    }
+    transactionForm.reset(); personDetailsDiv.style.display = 'none';
+    await takeDailySnapshot();
+    loadTransactionsAndReportForDate(datePicker.valueAsDate);
+    renderMonthlyChart();
+});
 
-function loadAllDuesAndPayables() { /* ... same as before ... */ }
+function loadAllDuesAndPayables() {
+    const renderList = (collectionName, listId) => {
+        const nameField = collectionName === 'dues' ? 'customerName' : 'personName';
+        const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where('status', '!=', 'paid'), orderBy(nameField));
+        onSnapshot(q, snapshot => {
+            const list = document.getElementById(listId); list.innerHTML = '';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const phoneButtons = data.phoneNumber ? `<button class="whatsapp-btn" title="Send WhatsApp Message">💬</button><button class="sms-btn" title="Send SMS">✉️</button>` : '';
+                list.innerHTML += `<li data-id="${doc.id}" data-type="${collectionName}" data-phone="${data.phoneNumber || ''}" data-name="${data[nameField]}" data-amount="${data.remainingAmount}">
+                        <div class="list-item-info"><strong>${data[nameField]}</strong><br><small>${collectionName === 'dues' ? 'বাকি' : 'দিতে হবে'}: ৳${data.remainingAmount.toFixed(2)}</small></div>
+                        <div class="list-item-actions">${phoneButtons}<button class="view-due-btn">বিস্তারিত</button></div>
+                    </li>`;
+            });
+        });
+    };
+    renderList('dues', 'due-list-ul');
+    renderList('payables', 'payable-list-ul');
+}
 
-function setupMessagingListeners(listId) { /* ... same as before ... */ }
+function setupMessagingListeners(listId) {
+    document.getElementById(listId).addEventListener('click', async e => {
+        const button = e.target.closest('button');
+        if (!button || (!button.classList.contains('whatsapp-btn') && !button.classList.contains('sms-btn'))) return;
+        
+        const listItem = e.target.closest('li');
+        let phone = listItem.dataset.phone;
+        const name = listItem.dataset.name;
+        const amount = listItem.dataset.amount;
+        const entryId = listItem.dataset.id;
+        const entryType = listItem.dataset.type;
+
+        if (!phone) return alert("এই ব্যক্তির জন্য কোনো ফোন নম্বর সেভ করা নেই।");
+        
+        phone = phone.replace(/[^0-9+]/g, '');
+        if (phone.startsWith('+')) { phone = phone.replace(/\s/g, ''); }
+        else {
+            if (phone.length === 11 && phone.startsWith('0')) { phone = `88${phone.substring(1)}`; }
+            else if (phone.length === 10) { phone = `91${phone}`; }
+        }
+        
+        const entryRef = doc(db, `users/${currentUser.uid}/${entryType}/${entryId}`);
+        const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
+        const itemsSnap = await getDocs(itemsQuery);
+        
+        let itemsList = itemsSnap.docs.map(doc => {
+            const item = doc.data();
+            return `${item.name} - ৳${item.amount}`;
+        }).join('\n');
+        
+        const entrySnap = await getDoc(entryRef);
+        const totalAmount = entrySnap.data().totalAmount;
+        const paidAmount = entrySnap.data().paidAmount;
+
+        const message = `নমস্কার ${name},\n\nআপনার হিসাবের বিবরণ:\n${itemsList}\n--------------------\nমোট: ৳${totalAmount}\nজমা: ৳${paidAmount}\n--------------------\nবাকি: ৳${amount}\n\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
+        const encodedMessage = encodeURIComponent(message);
+        
+        if (button.classList.contains('whatsapp-btn')) {
+            window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+        } else if (button.classList.contains('sms-btn')) {
+            window.location.href = `sms:${phone}?body=${encodedMessage}`;
+        }
+    });
+}
 setupMessagingListeners('due-list-ul');
 setupMessagingListeners('payable-list-ul');
 
@@ -182,11 +395,17 @@ function setupModalEventListeners(listId) {
             document.getElementById('modal-total').textContent = `৳${data.totalAmount.toFixed(2)}`;
             document.getElementById('modal-paid').textContent = `৳${data.paidAmount.toFixed(2)}`;
             document.getElementById('modal-remaining').textContent = `৳${data.remainingAmount.toFixed(2)}`;
-            document.getElementById('update-person-phone').value = data.phoneNumber || ''; // Load existing phone number
+            document.getElementById('update-person-phone').value = data.phoneNumber || '';
             const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
-            onSnapshot(itemsQuery, i_snap => { /* ... same as before ... */ });
+            onSnapshot(itemsQuery, i_snap => {
+                const itemListUl = document.getElementById('modal-item-list'); itemListUl.innerHTML = '';
+                i_snap.forEach(i_doc => { const item = i_doc.data(); const dateStr = item.date ? item.date.toDate().toLocaleDateString() : ''; itemListUl.innerHTML += `<li><span>${item.name} <small>(${dateStr})</small></span><span>৳${item.amount.toFixed(2)}</span></li>`; });
+            });
             const paymentsQuery = query(collection(entryRef, 'payments'), orderBy('paymentDate', 'desc'));
-            onSnapshot(paymentsQuery, p_snap => { /* ... same as before ... */ });
+            onSnapshot(paymentsQuery, p_snap => {
+                const historyUl = document.getElementById('modal-payment-history'); historyUl.innerHTML = '';
+                p_snap.forEach(p_doc => { const p = p_doc.data(); if (p.paymentDate) { historyUl.innerHTML += `<li>${p.paymentDate.toDate().toLocaleDateString()}: ৳${p.amount.toFixed(2)}</li>`; } });
+            });
         });
         modal.style.display = 'block';
     });
@@ -209,8 +428,23 @@ document.getElementById('update-phone-btn').addEventListener('click', async () =
     }
 });
 
-
-document.getElementById('add-item-btn').addEventListener('click', async () => { /* ... same as before ... */ });
+document.getElementById('add-item-btn').addEventListener('click', async () => {
+    const itemName = document.getElementById('new-item-name').value;
+    const itemAmount = parseFloat(document.getElementById('new-item-amount').value);
+    if (!itemName || !itemAmount || itemAmount <= 0) return alert('সঠিক আইটেম ও দাম দিন।');
+    const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
+    await runTransaction(db, async (transaction) => {
+        const docSnap = await transaction.get(entryRef);
+        if (!docSnap.exists()) throw "Entry does not exist!";
+        const newTotal = docSnap.data().totalAmount + itemAmount;
+        const newRemaining = docSnap.data().remainingAmount + itemAmount;
+        transaction.update(entryRef, { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() });
+        const newItemRef = doc(collection(entryRef, 'items'));
+        transaction.set(newItemRef, { name: itemName, amount: itemAmount, date: serverTimestamp() });
+    });
+    document.getElementById('new-item-name').value = '';
+    document.getElementById('new-item-amount').value = '';
+});
 
 document.getElementById('add-payment-btn').addEventListener('click', async () => {
     const paymentAmount = parseFloat(document.getElementById('new-payment-amount').value);
@@ -230,10 +464,34 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
     } catch (e) { alert(e.message); }
 });
 
-mainApp.addEventListener('click', async (e) => { /* ... same as before ... */ });
-
-// Pasting ALL remaining functions for A-Z completeness
-async function takeDailySnapshot(date = new Date(), forceBalance) {if (!currentUser) return;const dateId = getDateId(date);const snapshotRef = doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`);let closingBalance=forceBalance;if(!closingBalance){const balanceDoc=await getDoc(doc(db,`users/${currentUser.uid}/balance/main`));closingBalance=balanceDoc.exists()?balanceDoc.data():{online:0,cash:0}}await setDoc(snapshotRef,{closingOnline:closingBalance.online,closingCash:closingBalance.cash,timestamp:serverTimestamp()});localStorage.setItem(`lastSnapshot_${currentUser.uid}`,dateId)}
-function loadAllDuesAndPayables(){const renderList=(collectionName,listId)=>{const nameField=collectionName==='dues'?'customerName':'personName';const q=query(collection(db,`users/${currentUser.uid}/${collectionName}`),where('status','!=','paid'),orderBy(nameField));onSnapshot(q,snapshot=>{const list=document.getElementById(listId);list.innerHTML='';snapshot.forEach(doc=>{const data=doc.data();const phoneButtons=data.phoneNumber?`<button class="whatsapp-btn" title="Send WhatsApp Message">💬</button><button class="sms-btn" title="Send SMS">✉️</button>`:'';list.innerHTML+=`<li data-id="${doc.id}" data-type="${collectionName}" data-phone="${data.phoneNumber||''}" data-name="${data[nameField]}" data-amount="${data.remainingAmount}"><div class="list-item-info"><strong>${data[nameField]}</strong><br><small>${collectionName==='dues'?'বাকি':'দিতে হবে'}: ৳${data.remainingAmount.toFixed(2)}</small></div><div class="list-item-actions">${phoneButtons}<button class="view-due-btn">বিস্তারিত</button></div></li>`})})};renderList('dues','due-list-ul');renderList('payables','payable-list-ul')}
-document.getElementById('add-item-btn').addEventListener('click', async () => { const itemName = document.getElementById('new-item-name').value; const itemAmount = parseFloat(document.getElementById('new-item-amount').value); if (!itemName || !itemAmount || itemAmount <= 0) return alert('সঠিক আইটেম ও দাম দিন।'); const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`); await runTransaction(db, async (transaction) => { const docSnap = await transaction.get(entryRef); if (!docSnap.exists()) throw "Entry does not exist!"; const newTotal = docSnap.data().totalAmount + itemAmount; const newRemaining = docSnap.data().remainingAmount + itemAmount; transaction.update(entryRef, { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() }); const newItemRef = doc(collection(entryRef, 'items')); transaction.set(newItemRef, { name: itemName, amount: itemAmount, date: serverTimestamp() }); }); document.getElementById('new-item-name').value = ''; document.getElementById('new-item-amount').value = ''; });
-mainApp.addEventListener('click', async (e) => { const button = e.target.closest('button'); if (!button || !button.classList.contains('delete-btn')) return; const listItem = button.closest('li'); if(!listItem) return; const id = listItem.dataset.id; const type = listItem.dataset.type; if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return; if (type === 'transaction') { const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`); const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`); try { await runTransaction(db, async (t) => { const transDoc = await t.get(transRef); const balanceDoc = await t.get(balanceRef); if (!transDoc.exists() || !balanceDoc.exists()) throw "Document not found"; const tData = transDoc.data(); const bData = balanceDoc.data(); if (tData.category === 'online-income') bData.online -= tData.amount; else if (tData.category === 'cash-income') bData.cash -= tData.amount; else if (tData.category === 'online-expense') bData.online += tData.amount; else if (tData.category === 'cash-expense') bData.cash += tData.amount; t.update(balanceRef, bData); t.delete(transRef); }); await takeDailySnapshot(); loadTransactionsAndReportForDate(datePicker.valueAsDate); renderMonthlyChart(); } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); } } });
+mainApp.addEventListener('click', async (e) => {
+    const button = e.target.closest('button');
+    if (!button || !button.classList.contains('delete-btn')) return;
+    const listItem = button.closest('li');
+    if(!listItem) return;
+    const id = listItem.dataset.id; 
+    const type = listItem.dataset.type;
+    if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+    if (type === 'transaction') {
+        const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
+        const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
+        try {
+            await runTransaction(db, async (t) => {
+                const transDoc = await t.get(transRef);
+                const balanceDoc = await t.get(balanceRef);
+                if (!transDoc.exists() || !balanceDoc.exists()) throw "Document not found";
+                const tData = transDoc.data();
+                const bData = balanceDoc.data();
+                if (tData.category === 'online-income') bData.online -= tData.amount;
+                else if (tData.category === 'cash-income') bData.cash -= tData.amount;
+                else if (tData.category === 'online-expense') bData.online += tData.amount;
+                else if (tData.category === 'cash-expense') bData.cash += tData.amount;
+                t.update(balanceRef, bData);
+                t.delete(transRef);
+            });
+            await takeDailySnapshot();
+            loadTransactionsAndReportForDate(datePicker.valueAsDate);
+            renderMonthlyChart();
+        } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
+    }
+});
