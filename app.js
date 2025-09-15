@@ -30,7 +30,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -39,7 +38,6 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-
         if (balanceSnap.exists()) {
             const currentData = balanceSnap.data();
             document.getElementById('initial-online-balance').value = currentData.online || 0;
@@ -90,7 +88,6 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
-
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -105,7 +102,6 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
-
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -194,8 +190,7 @@ async function renderMonthlyChart() {
     
     const labels = [], onlineData = [], cashData = [];
     for (let i = 29; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+        const d = new Date(); d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}));
         const dateId = getDateId(d);
         const snapshotDoc = await getDoc(doc(db, `users/${currentUser.uid}/daily_snapshots/${dateId}`));
@@ -355,19 +350,26 @@ function setupMessagingListeners(listId) {
         }
         
         const entryRef = doc(db, `users/${currentUser.uid}/${entryType}/${entryId}`);
-        const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
+        const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'asc'));
         const itemsSnap = await getDocs(itemsQuery);
         
         let itemsList = itemsSnap.docs.map(doc => {
             const item = doc.data();
-            return `${item.name} - ৳${item.amount}`;
+            const itemDate = item.date ? `(${item.date.toDate().toLocaleDateString()})` : '';
+            return `${item.name} ${itemDate} - ৳${item.amount}`;
         }).join('\n');
         
         const entrySnap = await getDoc(entryRef);
         const totalAmount = entrySnap.data().totalAmount;
         const paidAmount = entrySnap.data().paidAmount;
 
-        const message = `নমস্কার ${name},\n\nআপনার হিসাবের বিবরণ:\n${itemsList}\n--------------------\nমোট: ৳${totalAmount}\nজমা: ৳${paidAmount}\n--------------------\nবাকি: ৳${amount}\n\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
+        let message = '';
+        if (entryType === 'dues') {
+            message = `নমস্কার ${name},\n\nআপনার হিসাবের বিবরণ:\n${itemsList}\n--------------------\nমোট: ৳${totalAmount}\nজমা: ৳${paidAmount}\n--------------------\nবাকি: ৳${amount}\n\nঅনুগ্রহ করে সময়মতো পরিশোধ করার অনুরোধ রইল।\nধন্যবাদ।`;
+        } else {
+            message = `নমস্কার ${name},\n\nআপনার সাথে আমার হিসাবের বিবরণ নিচে দেওয়া হলো:\n\n${itemsList}\n--------------------\nমোট পাওনা: ৳${totalAmount}\nআমি পরিশোধ করেছি: ৳${paidAmount}\n--------------------\nএখন আপনাকে আমার দিতে হবে: ৳${amount}\n\nধন্যবাদ।`;
+        }
+        
         const encodedMessage = encodeURIComponent(message);
         
         if (button.classList.contains('whatsapp-btn')) {
