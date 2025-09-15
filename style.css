@@ -54,7 +54,7 @@ body { font-family: 'Hind Siliguri', sans-serif; background-color: var(--backgro
 .income-color { color: var(--accent-green); }
 .expense-color { color: var(--accent-red); }
 #date-filter { margin-top: 25px; }
-#transaction-form input, #transaction-form select {
+#transaction-form input, #transaction-form select, .add-new-item-form input, .add-new-payment-form input {
     background-color: #f5f5f5; border: 1px solid var(--border-color);
     border-radius: 8px; padding: 14px; margin-bottom: 10px; width: 100%;
     font-size: 16px; -webkit-appearance: none;
@@ -63,7 +63,7 @@ body { font-family: 'Hind Siliguri', sans-serif; background-color: var(--backgro
     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
     background-repeat: no-repeat; background-position: right 15px top 50%; background-size: .65em auto;
 }
-#add-transaction-btn, #add-item-btn, #add-payment-btn { background-color: var(--primary-blue); margin-top: 10px; cursor: pointer; }
+#add-transaction-btn, #add-item-btn, #add-payment-btn, #update-phone-btn { background-color: var(--primary-blue); margin-top: 10px; cursor: pointer; }
 .secondary-btn { background-color: #f1f1f1; color: var(--text-dark); font-weight: 500; cursor: pointer; }
 .tabs { display: flex; background-color: #e9ecef; border-radius: 10px; padding: 5px; margin-top: 30px; }
 .tab-link {
@@ -81,8 +81,8 @@ li {
 .list-item-actions { display: flex; align-items: center; flex-shrink: 0; }
 .delete-btn { background: none; border: none; color: var(--accent-red); cursor: pointer; width: auto; padding: 5px; font-size: 18px; margin: 0; }
 .view-due-btn { background-color: var(--primary-blue); color: white; padding: 8px 12px; font-size: 14px; width: auto; border-radius: 8px; margin: 0; cursor: pointer; }
-.whatsapp-btn { background-color: #25D366; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; padding: 0; margin: 0 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.sms-btn { background-color: #4A90E2; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; padding: 0; margin: 0 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.whatsapp-btn, .sms-btn { background-color: #25D366; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; padding: 0; margin: 0 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.sms-btn { background-color: #4A90E2; }
 
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
 .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; }
@@ -91,6 +91,6 @@ li {
 .due-summary { display: flex; justify-content: space-around; background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
 .due-summary div { font-size: 14px; }
 .due-summary span { display: block; font-size: 18px; font-weight: 600; color: var(--text-dark); }
-#modal-body h3 { font-size: 16px; margin-top: 25px; margin-bottom: 10px; color: var(--primary-blue); }
+#modal-body h3, .add-new-item-form h4 { font-size: 16px; margin-top: 25px; margin-bottom: 10px; color: var(--primary-blue); }
 #modal-item-list, #modal-payment-history { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
 .add-new-item-form, .add-new-payment-form { background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin-top: 15px; }
