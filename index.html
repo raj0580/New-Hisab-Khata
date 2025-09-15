@@ -22,11 +22,11 @@
     <div id="app-container" style="display: none;">
         <div id="setup-screen" class="container" style="display: none;">
              <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
-             <p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন।</p>
+             <p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন। অ্যাপ স্বয়ংক্রিয়ভাবে আপনার আগের হিসাব লোড করেছে।</p>
             <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
             <input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
-            <button id="save-initial-balance">সেভ করুন</button>
-            <button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান</button>
+            <button id="save-initial-balance">সেভ ও এগিয়ে যান</button>
+            <button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান (নতুন ইউজার)</button>
         </div>
 
         <div id="main-app" class="container" style="display: none;">
@@ -46,14 +46,8 @@
             
             <h2 class="section-title">মাসিক গ্রাফ (স্ক্রল করুন)</h2>
             <div class="split-chart-container">
-                <div class="chart-y-axis left">
-                    <canvas id="y-axis-chart-left"></canvas>
-                </div>
-                <div class="chart-container-wrapper">
-                    <div class="chart-container">
-                        <canvas id="monthly-chart"></canvas>
-                    </div>
-                </div>
+                <div class="chart-y-axis left"><canvas id="y-axis-chart-left"></canvas></div>
+                <div class="chart-container-wrapper"><div class="chart-container"><canvas id="monthly-chart"></canvas></div></div>
             </div>
 
             <h2 class="section-title">দৈনিক রিপোর্ট</h2>
@@ -103,6 +97,14 @@
                     <div><strong>পরিশোধ:</strong> <span id="modal-paid"></span></div>
                     <div><strong>বাকি:</strong> <span id="modal-remaining"></span></div>
                 </div>
+
+                <!-- *** NEW: Phone number update section *** -->
+                <div class="add-new-item-form">
+                    <h4>ফোন নম্বর যোগ/আপডেট করুন</h4>
+                    <input type="tel" id="update-person-phone" placeholder="ফোন নম্বর">
+                    <button id="update-phone-btn">সেভ করুন</button>
+                </div>
+                
                 <h3>আইটেম/কারণ</h3><ul id="modal-item-list"></ul>
                 <div class="add-new-item-form">
                     <h4>নতুন আইটেম/কারণ যোগ করুন</h4>
