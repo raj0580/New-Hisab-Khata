@@ -24,12 +24,14 @@ loginBtn.addEventListener('click', () => signInWithEmailAndPassword(auth, emailI
 signupLink.addEventListener('click', e => { e.preventDefault(); createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => alert(err.message)); });
 logoutBtn.addEventListener('click', async () => { await takeDailySnapshot(); signOut(auth); });
 
+// *** CRITICAL FIX: Bulletproof Balance Check Logic ***
 async function checkInitialBalance() {
     if (!currentUser || hasCheckedBalance) return;
     const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -38,17 +40,18 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
+
         if (balanceSnap.exists()) {
-            const currentData = balanceSnap.data();
-            document.getElementById('initial-online-balance').value = currentData.online || 0;
-            document.getElementById('initial-cash-balance').value = currentData.cash || 0;
+            // Balance exists, go directly to the main app.
+            showMainApp();
         } else {
+            // This is a new user, show the setup screen.
             document.getElementById('initial-online-balance').value = '';
             document.getElementById('initial-cash-balance').value = '';
+            setupScreen.style.display = 'block';
+            mainApp.style.display = 'none';
         }
-        setupScreen.style.display = 'block';
-        mainApp.style.display = 'none';
-    } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
+    } catch (error) { console.error("Error checking balance:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
 
 async function showMainApp() {
@@ -67,13 +70,8 @@ const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
-    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceSnap = await getDoc(balanceRef);
-    if (balanceSnap.exists()){
-        await updateDoc(balanceRef, { online, cash });
-    } else {
-        await setDoc(balanceRef, { online, cash, initialOnline: online, initialCash: cash });
-    }
+    // For the very first save, set both current and initial balances.
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash });
     await takeDailySnapshot(new Date(), { online, cash });
     showMainApp();
 });
@@ -88,6 +86,7 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
+
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -102,6 +101,7 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
+
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -211,9 +211,9 @@ async function renderMonthlyChart() {
         ]
     };
 
-    const allData = onlineData.concat(cashData).filter(v => v !== null);
-    const maxVal = allData.length > 0 ? Math.max(...allData) : 1000;
-    const yAxisMax = Math.ceil((maxVal + maxVal * 0.1) / 1000) * 1000;
+    const allData = onlineData.concat(cashData).filter(v => v !== null && !isNaN(v));
+    const maxVal = allData.length > 0 ? Math.max(...allData) : 0;
+    const yAxisMax = (Math.ceil(maxVal / 5000) || 0) * 5000 + 5000;
 
     const yAxisOptions = {
         responsive: true, maintainAspectRatio: false,
@@ -224,6 +224,7 @@ async function renderMonthlyChart() {
                 max: yAxisMax,
                 ticks: { 
                     padding: 10,
+                    stepSize: 5000,
                     callback: function(value) {
                         if (value >= 1000) return (value / 1000) + 'k';
                         return value;
@@ -463,6 +464,7 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
             transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
         });
         document.getElementById('new-payment-amount').value = '';
+        modal.style.display = 'none';
     } catch (e) { alert(e.message); }
 });
 
