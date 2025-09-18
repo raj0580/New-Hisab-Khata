@@ -121,7 +121,11 @@ async function loadTransactionsAndReportForDate(selectedDate) {
             const t = doc.data();
             if (t.type === 'income') dailyIncome += t.amount;
             if (t.type === 'expense') dailyExpense += t.amount;
-            list.innerHTML += `<li><div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div><div class="list-item-actions"><button class="delete-btn" data-id="${doc.id}" data-type="transaction">🗑️</button></div></li>`;
+            // *** CRITICAL FIX: Added data-id and data-type to the LI element ***
+            list.innerHTML += `<li data-id="${doc.id}" data-type="transaction">
+                                    <div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div>
+                                    <div class="list-item-actions"><button class="delete-btn">🗑️</button></div>
+                               </li>`;
         });
         document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
         document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
@@ -464,18 +468,11 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button');
     if (!button || !button.classList.contains('delete-btn')) return;
-    const listItem = button.closest('li, div'); // Can be in LI or DIV
+    const listItem = button.closest('li');
     if(!listItem) return;
-    
-    // Find the closest parent that has the data-id, which should be the LI in the list
-    const dataListItem = button.closest('li[data-id]');
-    if(!dataListItem) return;
-
-    const id = dataListItem.dataset.id; 
-    const type = dataListItem.dataset.type;
-
+    const id = listItem.dataset.id; 
+    const type = listItem.dataset.type;
     if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
-
     if (type === 'transaction') {
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
