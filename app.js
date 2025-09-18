@@ -30,6 +30,7 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -80,6 +81,7 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
+
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -94,6 +96,7 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
+
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -121,11 +124,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
             const t = doc.data();
             if (t.type === 'income') dailyIncome += t.amount;
             if (t.type === 'expense') dailyExpense += t.amount;
-            // *** CRITICAL FIX: Added data-id and data-type to the LI element ***
-            list.innerHTML += `<li data-id="${doc.id}" data-type="transaction">
-                                    <div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div>
-                                    <div class="list-item-actions"><button class="delete-btn">🗑️</button></div>
-                               </li>`;
+            list.innerHTML += `<li data-id="${doc.id}" data-type="transaction"><div class="list-item-info"><span>${t.category}: ৳${t.amount} (${t.description})</span></div><div class="list-item-actions"><button class="delete-btn">🗑️</button></div></li>`;
         });
         document.getElementById('daily-income').textContent = `৳${dailyIncome.toFixed(2)}`;
         document.getElementById('daily-expense').textContent = `৳${dailyExpense.toFixed(2)}`;
@@ -399,7 +398,20 @@ function setupModalEventListeners(listId) {
             const itemsQuery = query(collection(entryRef, 'items'), orderBy('date', 'desc'));
             onSnapshot(itemsQuery, i_snap => {
                 const itemListUl = document.getElementById('modal-item-list'); itemListUl.innerHTML = '';
-                i_snap.forEach(i_doc => { const item = i_doc.data(); const dateStr = item.date ? item.date.toDate().toLocaleDateString() : ''; itemListUl.innerHTML += `<li><span>${item.name} <small>(${dateStr})</small></span><span>৳${item.amount.toFixed(2)}</span></li>`; });
+                i_snap.forEach(i_doc => {
+                    const item = i_doc.data();
+                    const dateStr = item.date ? item.date.toDate().toLocaleDateString() : '';
+                    itemListUl.innerHTML += `
+                        <li data-item-id="${i_doc.id}" data-item-amount="${item.amount}">
+                            <div class="list-item-info">
+                                <span>${item.name} <small>(${dateStr})</small></span>
+                                <span>৳${item.amount.toFixed(2)}</span>
+                            </div>
+                            <div class="list-item-actions">
+                                <button class="delete-btn item-delete-btn">🗑️</button>
+                            </div>
+                        </li>`;
+                });
             });
             const paymentsQuery = query(collection(entryRef, 'payments'), orderBy('paymentDate', 'desc'));
             onSnapshot(paymentsQuery, p_snap => {
@@ -461,18 +473,20 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
             transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
         });
         document.getElementById('new-payment-amount').value = '';
-        modal.style.display = 'none';
     } catch (e) { alert(e.message); }
 });
 
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button');
     if (!button || !button.classList.contains('delete-btn')) return;
-    const listItem = button.closest('li');
+    const listItem = button.closest('li[data-id]');
     if(!listItem) return;
+    
     const id = listItem.dataset.id; 
     const type = listItem.dataset.type;
+    
     if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+
     if (type === 'transaction') {
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
@@ -494,5 +508,49 @@ mainApp.addEventListener('click', async (e) => {
             loadTransactionsAndReportForDate(datePicker.valueAsDate);
             renderMonthlyChart();
         } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
+    }
+});
+
+modal.addEventListener('click', async (e) => {
+    const button = e.target.closest('button');
+    if (!button || !button.classList.contains('item-delete-btn')) return;
+
+    const listItem = button.closest('li');
+    const itemId = listItem.dataset.itemId;
+    const itemAmount = parseFloat(listItem.dataset.itemAmount);
+    
+    if (!itemId || !itemAmount) return alert("কিছু একটা সমস্যা হয়েছে।");
+    if (!confirm(`আপনি কি এই আইটেমটি (৳${itemAmount}) মুছে ফেলতে এবং পেমেন্ট হিসেবে গণ্য করতে নিশ্চিত?`)) return;
+
+    const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
+    const itemRef = doc(entryRef, 'items', itemId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const entryDoc = await transaction.get(entryRef);
+            if (!entryDoc.exists()) throw "Entry not found!";
+            
+            const newPaid = entryDoc.data().paidAmount + itemAmount;
+            const newRemaining = entryDoc.data().remainingAmount - itemAmount;
+
+            transaction.update(entryRef, {
+                paidAmount: newPaid,
+                remainingAmount: newRemaining,
+                status: newRemaining <= 0 ? 'paid' : 'partially-paid',
+                lastUpdatedAt: serverTimestamp()
+            });
+
+            const newPaymentRef = doc(collection(entryRef, 'payments'));
+            transaction.set(newPaymentRef, {
+                amount: itemAmount,
+                paymentDate: serverTimestamp(),
+                note: `Paid by clearing item: ${itemId}`
+            });
+
+            transaction.delete(itemRef);
+        });
+    } catch (error) {
+        console.error("Error deleting item:", error);
+        alert("আইটেমটি মুছতে সমস্যা হয়েছে।");
     }
 });
