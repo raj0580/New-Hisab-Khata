@@ -39,15 +39,13 @@ async function checkInitialBalance() {
             }
         }
         if (balanceSnap.exists()) {
-            const currentData = balanceSnap.data();
-            document.getElementById('initial-online-balance').value = currentData.online || 0;
-            document.getElementById('initial-cash-balance').value = currentData.cash || 0;
+            showMainApp();
         } else {
             document.getElementById('initial-online-balance').value = '';
             document.getElementById('initial-cash-balance').value = '';
+            setupScreen.style.display = 'block';
+            mainApp.style.display = 'none';
         }
-        setupScreen.style.display = 'block';
-        mainApp.style.display = 'none';
     } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
 
@@ -67,13 +65,7 @@ const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
 saveInitialBalanceBtn.addEventListener('click', async () => {
     const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
     const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
-    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceSnap = await getDoc(balanceRef);
-    if (balanceSnap.exists()){
-        await updateDoc(balanceRef, { online, cash });
-    } else {
-        await setDoc(balanceRef, { online, cash, initialOnline: online, initialCash: cash });
-    }
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, initialOnline: online, initialCash: cash });
     await takeDailySnapshot(new Date(), { online, cash });
     showMainApp();
 });
@@ -88,7 +80,6 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
 });
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
-
 async function takeDailySnapshot(date = new Date(), forceBalance) {
     if (!currentUser) return;
     const dateId = getDateId(date);
@@ -103,7 +94,6 @@ async function takeDailySnapshot(date = new Date(), forceBalance) {
 }
 
 datePicker.addEventListener('change', () => loadTransactionsAndReportForDate(datePicker.valueAsDate));
-
 function loadDashboardData() {
     const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
     onSnapshot(balanceRef, (doc) => {
@@ -212,9 +202,9 @@ async function renderMonthlyChart() {
             { label: 'ক্যাশ ব্যালেন্স', data: cashData, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.2, spanGaps: true }
         ]
     };
-    
+
     const allData = onlineData.concat(cashData).filter(v => typeof v === 'number' && !isNaN(v));
-    const maxVal = allData.length > 0 ? Math.max(...allData) : 1000;
+    const maxVal = allData.length > 0 ? Math.max(...allData) : 0;
     const yAxisMax = (Math.ceil(maxVal / 5000) || 0) * 5000 + 5000;
 
     const yAxisOptions = {
@@ -474,11 +464,18 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button');
     if (!button || !button.classList.contains('delete-btn')) return;
-    const listItem = button.closest('li');
+    const listItem = button.closest('li, div'); // Can be in LI or DIV
     if(!listItem) return;
-    const id = listItem.dataset.id; 
-    const type = listItem.dataset.type;
+    
+    // Find the closest parent that has the data-id, which should be the LI in the list
+    const dataListItem = button.closest('li[data-id]');
+    if(!dataListItem) return;
+
+    const id = dataListItem.dataset.id; 
+    const type = dataListItem.dataset.type;
+
     if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
+
     if (type === 'transaction') {
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
