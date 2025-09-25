@@ -14,6 +14,7 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal'), customerModal = document.getElementById('customer-details-modal');
 let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false;
 window.chartInstances = [];
+let allCustomersCache = [];
 
 // Auth State Logic
 onAuthStateChanged(auth, user => {
@@ -250,15 +251,14 @@ async function renderMonthlyChart() {
     }
 }
 
-categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
-
 async function findOrCreateCustomer(name, phone) {
-    const customerQuery = query(collection(db, `users/${currentUser.uid}/customers`), where('name', '==', name));
+    const standardizedName = name.trim().toLowerCase();
+    const customerQuery = query(collection(db, `users/${currentUser.uid}/customers`), where('searchableName', '==', standardizedName));
     const querySnapshot = await getDocs(customerQuery);
     let customerRef;
     if (querySnapshot.empty) {
         customerRef = doc(collection(db, `users/${currentUser.uid}/customers`));
-        await setDoc(customerRef, { name, phone: phone || '', totalDueAmount: 0, totalPaidAmount: 0, currentDue: 0, lastActivity: serverTimestamp() });
+        await setDoc(customerRef, { name: name.trim(), searchableName: standardizedName, phone: phone || '', totalDueAmount: 0, totalPaidAmount: 0, currentDue: 0, lastActivity: serverTimestamp() });
     } else {
         customerRef = querySnapshot.docs[0].ref;
         if (phone) { await updateDoc(customerRef, { phone }); }
@@ -266,11 +266,13 @@ async function findOrCreateCustomer(name, phone) {
     return customerRef;
 }
 
+categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
+
 document.getElementById('add-transaction-btn').addEventListener('click', async () => {
     const category = categorySelect.value;
     const amount = parseFloat(document.getElementById('amount').value);
     const description = document.getElementById('description').value;
-    const person = personNameInput.value;
+    const person = personNameInput.value.trim();
     const phone = personPhoneInput.value;
     if (!amount || amount <= 0) return alert('সঠিক পরিমাণ দিন।');
     
@@ -281,7 +283,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
         
-        const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
+        const customerRef = collectionName === 'due' ? await findOrCreateCustomer(person, phone) : null;
 
         const entryData = {
             status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone,
@@ -342,8 +344,10 @@ function loadAllCustomers() {
     onSnapshot(q, snapshot => {
         const list = document.getElementById('customer-list-ul');
         list.innerHTML = '';
+        allCustomersCache = [];
         snapshot.forEach(doc => {
             const data = doc.data();
+            allCustomersCache.push(data.name);
             list.innerHTML += `
                 <li class="customer-list-item" data-id="${doc.id}">
                     <div class="list-item-info">
@@ -358,6 +362,45 @@ function loadAllCustomers() {
                     </div>
                 </li>`;
         });
+        autocomplete(personNameInput, allCustomersCache);
+    });
+}
+
+function autocomplete(inp, arr) {
+    let currentFocus;
+    inp.addEventListener("input", function(e) {
+        let a, b, i, val = this.value;
+        closeAllLists();
+        if (!val) { return false;}
+        currentFocus = -1;
+        a = document.createElement("DIV");
+        a.setAttribute("id", this.id + "autocomplete-list");
+        a.setAttribute("class", "autocomplete-items");
+        this.parentNode.appendChild(a);
+        for (i = 0; i < arr.length; i++) {
+            if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase()) {
+                b = document.createElement("DIV");
+                b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
+                b.innerHTML += arr[i].substr(val.length);
+                b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
+                b.addEventListener("click", function(e) {
+                    inp.value = this.getElementsByTagName("input")[0].value;
+                    closeAllLists();
+                });
+                a.appendChild(b);
+            }
+        }
+    });
+    function closeAllLists(elmnt) {
+        var x = document.getElementsByClassName("autocomplete-items");
+        for (var i = 0; i < x.length; i++) {
+            if (elmnt != x[i] && elmnt != inp) {
+                x[i].parentNode.removeChild(x[i]);
+            }
+        }
+    }
+    document.addEventListener("click", function (e) {
+        closeAllLists(e.target);
     });
 }
 
@@ -487,7 +530,6 @@ document.getElementById('customer-list-ul').addEventListener('click', async (e) 
     customerModal.style.display = 'block';
 });
 
-
 document.getElementById('update-phone-btn').addEventListener('click', async () => {
     const newPhone = document.getElementById('update-person-phone').value;
     if (!currentOpenEntryId || !currentOpenEntryType) return;
@@ -521,7 +563,6 @@ document.getElementById('add-item-btn').addEventListener('click', async () => {
         transaction.update(entryRef, { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() });
         const newItemRef = doc(collection(entryRef, 'items'));
         transaction.set(newItemRef, { name: itemName, amount: itemAmount, date: serverTimestamp() });
-
         if (currentOpenEntryType === 'dues' && docSnap.data().customerId) {
             const customerRef = doc(db, `users/${currentUser.uid}/customers/${docSnap.data().customerId}`);
             transaction.update(customerRef, { totalDueAmount: increment(itemAmount), currentDue: increment(itemAmount), lastActivity: serverTimestamp() });
@@ -544,7 +585,6 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
             transaction.update(entryRef, { paidAmount: newPaid, remainingAmount: newRemaining, status: newRemaining <= 0 ? 'paid' : 'partially-paid', lastUpdatedAt: serverTimestamp() });
             const newPaymentRef = doc(collection(entryRef, 'payments'));
             transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
-
             if (currentOpenEntryType === 'dues' && docSnap.data().customerId) {
                 const customerRef = doc(db, `users/${currentUser.uid}/customers/${docSnap.data().customerId}`);
                 transaction.update(customerRef, { totalPaidAmount: increment(paymentAmount), currentDue: increment(-paymentAmount), lastActivity: serverTimestamp() });
@@ -565,7 +605,6 @@ mainApp.addEventListener('click', async (e) => {
     const type = listItem.dataset.type;
     
     if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
-
     if (type === 'transaction') {
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
