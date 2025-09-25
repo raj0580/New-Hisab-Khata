@@ -283,7 +283,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
         
-        const customerRef = collectionName === 'due' ? await findOrCreateCustomer(person, phone) : null;
+        const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
 
         const entryData = {
             status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone,
