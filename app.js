@@ -285,23 +285,45 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         
         const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
 
-        const entryData = {
-            status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone,
-        };
-        entryData[nameField] = person;
-        if(customerRef) entryData.customerId = customerRef.id;
+        const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', 'in', ['unpaid', 'partially-paid']));
+        const existingEntrySnap = await getDocs(q);
 
-        const newEntryRef = await addDoc(collection(db, `users/${currentUser.uid}/${collectionName}`), entryData);
-        await addDoc(collection(newEntryRef, 'items'), { name: description || 'N/A', amount, date: serverTimestamp() });
-
-        if(customerRef){
-            await updateDoc(customerRef, {
-                totalDueAmount: increment(amount),
-                currentDue: increment(amount),
-                lastActivity: serverTimestamp()
-            });
+        let entryRef;
+        if (existingEntrySnap.empty) {
+            entryRef = doc(collection(db, `users/${currentUser.uid}/${collectionName}`));
+        } else {
+            entryRef = existingEntrySnap.docs[0].ref;
         }
-        
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const docSnap = await transaction.get(entryRef);
+                const data = { name: description || 'N/A', amount, date: serverTimestamp() };
+                if (!docSnap.exists()) {
+                    const newEntry = { status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone, };
+                    newEntry[nameField] = person;
+                    if(customerRef) newEntry.customerId = customerRef.id;
+                    transaction.set(entryRef, newEntry);
+                } else {
+                    const newTotal = docSnap.data().totalAmount + amount;
+                    const newRemaining = docSnap.data().remainingAmount + amount;
+                    const updateData = { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() };
+                    if (phone && !docSnap.data().phoneNumber) updateData.phoneNumber = phone;
+                    transaction.update(entryRef, updateData);
+                }
+                
+                transaction.set(doc(collection(entryRef, 'items')), data);
+
+                if(customerRef){
+                    transaction.update(customerRef, {
+                        totalDueAmount: increment(amount),
+                        currentDue: increment(amount),
+                        lastActivity: serverTimestamp()
+                    });
+                }
+            });
+        } catch (e) { console.error("Transaction failed: ", e); }
+
     } else {
         await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
