@@ -71,7 +71,10 @@
                 <input type="number" id="amount" placeholder="পরিমাণ (৳)">
                 <input type="text" id="description" placeholder="বর্ণনা / আইটেম">
                 <div id="person-details" style="display: none;">
-                    <input type="text" id="person-name" placeholder="কাস্টমার / পাওনাদারের নাম">
+                    <div class="autocomplete-container">
+                        <input type="text" id="person-name" placeholder="কাস্টমার / পাওনাদারের নাম খুঁজুন বা লিখুন" autocomplete="off">
+                        <div id="autocomplete-list" class="autocomplete-items"></div>
+                    </div>
                     <input type="tel" id="person-phone" placeholder="ফোন নম্বর (e.g., +91987...)">
                 </div>
                 <button type="button" id="add-transaction-btn">যোগ করুন</button>
