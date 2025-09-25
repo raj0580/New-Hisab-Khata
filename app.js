@@ -31,6 +31,7 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
+        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -39,6 +40,7 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
+
         if (balanceSnap.exists()) {
             showMainApp();
         } else {
@@ -283,7 +285,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
         
-        const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
+        const customerRef = collectionName === 'due' ? await findOrCreateCustomer(person, phone) : null;
 
         const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', 'in', ['unpaid', 'partially-paid']));
         const existingEntrySnap = await getDocs(q);
@@ -338,7 +340,6 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     }
     transactionForm.reset(); personDetailsDiv.style.display = 'none';
     await takeDailySnapshot();
-    loadTransactionsAndReportForDate(datePicker.valueAsDate);
 });
 
 function loadAllDuesAndPayables() {
@@ -372,7 +373,7 @@ function loadAllCustomers() {
             allCustomersCache.push(data.name);
             list.innerHTML += `
                 <li class="customer-list-item" data-id="${doc.id}">
-                    <div class="list-item-info">
+                    <div class="list-item-info customer-info-clickable">
                         <strong>${data.name}</strong>
                         <div class="customer-summary">
                             <span>মোট ডিউ: ৳${(data.totalDueAmount || 0).toFixed(2)}</span>
@@ -381,6 +382,7 @@ function loadAllCustomers() {
                     </div>
                     <div class="list-item-actions">
                          <strong style="color: ${data.currentDue > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">বাকি: ৳${(data.currentDue || 0).toFixed(2)}</strong>
+                         <button class="delete-btn customer-delete-btn" title="কাস্টমার ডিলিট করুন">🗑️</button>
                     </div>
                 </li>`;
         });
@@ -525,7 +527,7 @@ customerModal.querySelector('.close-btn').onclick = () => customerModal.style.di
 
 document.getElementById('customer-list-ul').addEventListener('click', async (e) => {
     const listItem = e.target.closest('li[data-id]');
-    if (!listItem) return;
+    if (!listItem || e.target.closest('.delete-btn')) return;
     const customerId = listItem.dataset.id;
     const customerDoc = await getDoc(doc(db, `users/${currentUser.uid}/customers/${customerId}`));
     if(!customerDoc.exists()) return;
@@ -544,8 +546,10 @@ document.getElementById('customer-list-ul').addEventListener('click', async (e) 
             const due = d.data();
             const statusClass = due.status === 'paid' ? 'paid' : '';
             historyList.innerHTML += `<li class="due-history-item ${statusClass}">
-                <div><strong>মোট: ৳${due.totalAmount.toFixed(2)}</strong> (${new Date(due.lastUpdatedAt.seconds * 1000).toLocaleDateString()})</div>
-                <small>স্ট্যাটাস: ${due.status}</small>
+                <div class="due-history-header">
+                    <span><strong>মোট: ৳${due.totalAmount.toFixed(2)}</strong> (${new Date(due.lastUpdatedAt.seconds * 1000).toLocaleDateString()})</span>
+                    <small>স্ট্যাটাস: ${due.status}</small>
+                </div>
             </li>`;
         });
     });
