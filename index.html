@@ -78,13 +78,15 @@
             </form>
 
             <div class="tabs">
-                <button class="tab-link active" onclick="openTab(event, 'transactions-tab')">দৈনিক লেনদেন</button>
-                <button class="tab-link" onclick="openTab(event, 'dues-tab')">ডিউ তালিকা</button>
-                <button class="tab-link" onclick="openTab(event, 'payables-tab')">পাওনা তালিকা</button>
+                <button class="tab-link active" onclick="openTab(event, 'transactions-tab')">লেনদেন</button>
+                <button class="tab-link" onclick="openTab(event, 'dues-tab')">ডিউ</button>
+                <button class="tab-link" onclick="openTab(event, 'payables-tab')">পাওনা</button>
+                <button class="tab-link" onclick="openTab(event, 'customers-tab')">কাস্টমার</button>
             </div>
             <div id="transactions-tab" class="tab-content active"><ul id="transactions-list-ul"></ul></div>
             <div id="dues-tab" class="tab-content"><ul id="due-list-ul"></ul></div>
             <div id="payables-tab" class="tab-content"><ul id="payable-list-ul"></ul></div>
+            <div id="customers-tab" class="tab-content"><ul id="customer-list-ul"></ul></div>
         </div>
     </div>
     
@@ -116,6 +118,20 @@
                     <input type="number" id="new-payment-amount" placeholder="পরিমাণ">
                     <button id="add-payment-btn">পরিশোধ করুন</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Details Modal -->
+    <div id="customer-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="customer-modal-name"></h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div id="customer-modal-body">
+                <h3>সমস্ত ডিউ-এর ইতিহাস</h3>
+                <ul id="customer-modal-due-history"></ul>
             </div>
         </div>
     </div>
