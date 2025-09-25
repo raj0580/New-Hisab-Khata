@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enableIndexedDbPersistence, writeBatch, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, getDocs, collection, query, onSnapshot, deleteDoc, updateDoc, where, serverTimestamp, enableIndexedDbPersistence, writeBatch, orderBy, runTransaction, increment } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
 // Service Worker & Firebase Initialization
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js')); }
@@ -11,7 +11,7 @@ const db = getFirestore(app);
 enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ", err.code));
 
 // DOM Elements
-const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal');
+const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal'), customerModal = document.getElementById('customer-details-modal');
 let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false;
 window.chartInstances = [];
 
@@ -30,7 +30,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -57,6 +56,7 @@ async function showMainApp() {
         loadDashboardData();
         loadTransactionsAndReportForDate(datePicker.valueAsDate); 
         loadAllDuesAndPayables();
+        loadAllCustomers();
         renderMonthlyChart();
     }
 }
@@ -252,6 +252,20 @@ async function renderMonthlyChart() {
 
 categorySelect.addEventListener('change', () => { personDetailsDiv.style.display = ['due', 'payable'].includes(categorySelect.value) ? 'block' : 'none'; });
 
+async function findOrCreateCustomer(name, phone) {
+    const customerQuery = query(collection(db, `users/${currentUser.uid}/customers`), where('name', '==', name));
+    const querySnapshot = await getDocs(customerQuery);
+    let customerRef;
+    if (querySnapshot.empty) {
+        customerRef = doc(collection(db, `users/${currentUser.uid}/customers`));
+        await setDoc(customerRef, { name, phone: phone || '', totalDueAmount: 0, totalPaidAmount: 0, currentDue: 0, lastActivity: serverTimestamp() });
+    } else {
+        customerRef = querySnapshot.docs[0].ref;
+        if (phone) { await updateDoc(customerRef, { phone }); }
+    }
+    return customerRef;
+}
+
 document.getElementById('add-transaction-btn').addEventListener('click', async () => {
     const category = categorySelect.value;
     const amount = parseFloat(document.getElementById('amount').value);
@@ -266,27 +280,26 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     if (isDueOrPayable) {
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
-        const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', '!=', 'paid'));
-        const existingEntrySnap = await getDocs(q);
-        let entryRef = existingEntrySnap.empty ? doc(collection(db, `users/${currentUser.uid}/${collectionName}`)) : existingEntrySnap.docs[0].ref;
-        try {
-            await runTransaction(db, async (transaction) => {
-                const docSnap = await transaction.get(entryRef);
-                const data = { name: description || 'N/A', amount, date: serverTimestamp() };
-                if (!docSnap.exists()) {
-                    const newEntry = { status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone };
-                    newEntry[nameField] = person;
-                    transaction.set(entryRef, newEntry);
-                } else {
-                    const newTotal = docSnap.data().totalAmount + amount;
-                    const newRemaining = docSnap.data().remainingAmount + amount;
-                    const updateData = { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() };
-                    if (phone) updateData.phoneNumber = phone;
-                    transaction.update(entryRef, updateData);
-                }
-                transaction.set(doc(collection(entryRef, 'items')), data);
+        
+        const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
+
+        const entryData = {
+            status: 'unpaid', paidAmount: 0, totalAmount: amount, remainingAmount: amount, lastUpdatedAt: serverTimestamp(), phoneNumber: phone,
+        };
+        entryData[nameField] = person;
+        if(customerRef) entryData.customerId = customerRef.id;
+
+        const newEntryRef = await addDoc(collection(db, `users/${currentUser.uid}/${collectionName}`), entryData);
+        await addDoc(collection(newEntryRef, 'items'), { name: description || 'N/A', amount, date: serverTimestamp() });
+
+        if(customerRef){
+            await updateDoc(customerRef, {
+                totalDueAmount: increment(amount),
+                currentDue: increment(amount),
+                lastActivity: serverTimestamp()
             });
-        } catch (e) { console.error("Transaction failed: ", e); alert("এন্ট্রি যোগ করতে সমস্যা হয়েছে। Firebase Index তৈরি করেছেন কি?"); }
+        }
+        
     } else {
         await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
@@ -302,7 +315,6 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     transactionForm.reset(); personDetailsDiv.style.display = 'none';
     await takeDailySnapshot();
     loadTransactionsAndReportForDate(datePicker.valueAsDate);
-    renderMonthlyChart();
 });
 
 function loadAllDuesAndPayables() {
@@ -323,6 +335,30 @@ function loadAllDuesAndPayables() {
     };
     renderList('dues', 'due-list-ul');
     renderList('payables', 'payable-list-ul');
+}
+
+function loadAllCustomers() {
+    const q = query(collection(db, `users/${currentUser.uid}/customers`), orderBy('lastActivity', 'desc'));
+    onSnapshot(q, snapshot => {
+        const list = document.getElementById('customer-list-ul');
+        list.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            list.innerHTML += `
+                <li class="customer-list-item" data-id="${doc.id}">
+                    <div class="list-item-info">
+                        <strong>${data.name}</strong>
+                        <div class="customer-summary">
+                            <span>মোট ডিউ: ৳${(data.totalDueAmount || 0).toFixed(2)}</span>
+                            <span>পরিশোধ: ৳${(data.totalPaidAmount || 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="list-item-actions">
+                         <strong style="color: ${data.currentDue > 0 ? 'var(--accent-red)' : 'var(--accent-green)'};">বাকি: ৳${(data.currentDue || 0).toFixed(2)}</strong>
+                    </div>
+                </li>`;
+        });
+    });
 }
 
 function setupMessagingListeners(listId) {
@@ -401,15 +437,9 @@ function setupModalEventListeners(listId) {
                 i_snap.forEach(i_doc => {
                     const item = i_doc.data();
                     const dateStr = item.date ? item.date.toDate().toLocaleDateString() : '';
-                    itemListUl.innerHTML += `
-                        <li data-item-id="${i_doc.id}" data-item-amount="${item.amount}">
-                            <div class="list-item-info">
-                                <span>${item.name} <small>(${dateStr})</small></span>
-                                <span>৳${item.amount.toFixed(2)}</span>
-                            </div>
-                            <div class="list-item-actions">
-                                <button class="delete-btn item-delete-btn">🗑️</button>
-                            </div>
+                    itemListUl.innerHTML += `<li data-item-id="${i_doc.id}" data-item-amount="${item.amount}">
+                            <div class="list-item-info"><span>${item.name} <small>(${dateStr})</small></span><span>৳${item.amount.toFixed(2)}</span></div>
+                            <div class="list-item-actions"><button class="delete-btn item-delete-btn">🗑️</button></div>
                         </li>`;
                 });
             });
@@ -425,7 +455,38 @@ function setupModalEventListeners(listId) {
 setupModalEventListeners('due-list-ul');
 setupModalEventListeners('payable-list-ul');
 
-document.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
+document.querySelector('.close-btn').onclick = () => {modal.style.display = 'none'; customerModal.style.display = 'none'};
+customerModal.querySelector('.close-btn').onclick = () => customerModal.style.display = 'none';
+
+document.getElementById('customer-list-ul').addEventListener('click', async (e) => {
+    const listItem = e.target.closest('li[data-id]');
+    if (!listItem) return;
+    const customerId = listItem.dataset.id;
+    const customerDoc = await getDoc(doc(db, `users/${currentUser.uid}/customers/${customerId}`));
+    if(!customerDoc.exists()) return;
+    document.getElementById('customer-modal-name').textContent = customerDoc.data().name;
+    const historyList = document.getElementById('customer-modal-due-history');
+    historyList.innerHTML = 'লোড হচ্ছে...';
+    
+    const duesQuery = query(collection(db, `users/${currentUser.uid}/dues`), where('customerId', '==', customerId), orderBy('lastUpdatedAt', 'desc'));
+    onSnapshot(duesQuery, snapshot => {
+        historyList.innerHTML = '';
+        if(snapshot.empty){
+            historyList.innerHTML = '<li>কোনো ডিউ-এর ইতিহাস পাওয়া যায়নি।</li>';
+            return;
+        }
+        snapshot.forEach(d => {
+            const due = d.data();
+            const statusClass = due.status === 'paid' ? 'paid' : '';
+            historyList.innerHTML += `<li class="due-history-item ${statusClass}">
+                <div><strong>মোট: ৳${due.totalAmount.toFixed(2)}</strong> (${new Date(due.lastUpdatedAt.seconds * 1000).toLocaleDateString()})</div>
+                <small>স্ট্যাটাস: ${due.status}</small>
+            </li>`;
+        });
+    });
+    customerModal.style.display = 'block';
+});
+
 
 document.getElementById('update-phone-btn').addEventListener('click', async () => {
     const newPhone = document.getElementById('update-person-phone').value;
@@ -433,6 +494,13 @@ document.getElementById('update-phone-btn').addEventListener('click', async () =
     const entryRef = doc(db, `users/${currentUser.uid}/${currentOpenEntryType}/${currentOpenEntryId}`);
     try {
         await updateDoc(entryRef, { phoneNumber: newPhone });
+        if (currentOpenEntryType === 'dues') {
+            const entryDoc = await getDoc(entryRef);
+            if(entryDoc.exists() && entryDoc.data().customerId) {
+                const customerRef = doc(db, `users/${currentUser.uid}/customers/${entryDoc.data().customerId}`);
+                await updateDoc(customerRef, { phone: newPhone });
+            }
+        }
         alert("Phone number updated successfully!");
     } catch (e) {
         console.error("Error updating phone number: ", e);
@@ -453,6 +521,11 @@ document.getElementById('add-item-btn').addEventListener('click', async () => {
         transaction.update(entryRef, { totalAmount: newTotal, remainingAmount: newRemaining, lastUpdatedAt: serverTimestamp() });
         const newItemRef = doc(collection(entryRef, 'items'));
         transaction.set(newItemRef, { name: itemName, amount: itemAmount, date: serverTimestamp() });
+
+        if (currentOpenEntryType === 'dues' && docSnap.data().customerId) {
+            const customerRef = doc(db, `users/${currentUser.uid}/customers/${docSnap.data().customerId}`);
+            transaction.update(customerRef, { totalDueAmount: increment(itemAmount), currentDue: increment(itemAmount), lastActivity: serverTimestamp() });
+        }
     });
     document.getElementById('new-item-name').value = '';
     document.getElementById('new-item-amount').value = '';
@@ -471,14 +544,20 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
             transaction.update(entryRef, { paidAmount: newPaid, remainingAmount: newRemaining, status: newRemaining <= 0 ? 'paid' : 'partially-paid', lastUpdatedAt: serverTimestamp() });
             const newPaymentRef = doc(collection(entryRef, 'payments'));
             transaction.set(newPaymentRef, { amount: paymentAmount, paymentDate: serverTimestamp() });
+
+            if (currentOpenEntryType === 'dues' && docSnap.data().customerId) {
+                const customerRef = doc(db, `users/${currentUser.uid}/customers/${docSnap.data().customerId}`);
+                transaction.update(customerRef, { totalPaidAmount: increment(paymentAmount), currentDue: increment(-paymentAmount), lastActivity: serverTimestamp() });
+            }
         });
         document.getElementById('new-payment-amount').value = '';
+        modal.style.display = 'none';
     } catch (e) { alert(e.message); }
 });
 
 mainApp.addEventListener('click', async (e) => {
-    const button = e.target.closest('button');
-    if (!button || !button.classList.contains('delete-btn')) return;
+    const button = e.target.closest('button.delete-btn');
+    if (!button) return;
     const listItem = button.closest('li[data-id]');
     if(!listItem) return;
     
@@ -512,9 +591,8 @@ mainApp.addEventListener('click', async (e) => {
 });
 
 modal.addEventListener('click', async (e) => {
-    const button = e.target.closest('button');
-    if (!button || !button.classList.contains('item-delete-btn')) return;
-
+    const button = e.target.closest('button.item-delete-btn');
+    if (!button) return;
     const listItem = button.closest('li');
     const itemId = listItem.dataset.itemId;
     const itemAmount = parseFloat(listItem.dataset.itemAmount);
@@ -548,6 +626,15 @@ modal.addEventListener('click', async (e) => {
             });
 
             transaction.delete(itemRef);
+
+            if (currentOpenEntryType === 'dues' && entryDoc.data().customerId) {
+                const customerRef = doc(db, `users/${currentUser.uid}/customers/${entryDoc.data().customerId}`);
+                transaction.update(customerRef, {
+                    totalPaidAmount: increment(itemAmount),
+                    currentDue: increment(-itemAmount),
+                    lastActivity: serverTimestamp()
+                });
+            }
         });
     } catch (error) {
         console.error("Error deleting item:", error);
