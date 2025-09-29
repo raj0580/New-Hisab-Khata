@@ -86,7 +86,13 @@
                 <button class="tab-link" onclick="openTab(event, 'payables-tab')">পাওনা</button>
                 <button class="tab-link" onclick="openTab(event, 'customers-tab')">কাস্টমার</button>
             </div>
-            <div id="transactions-tab" class="tab-content active"><ul id="transactions-list-ul"></ul></div>
+            <div id="transactions-tab" class="tab-content active">
+                <div class="transaction-list-header">
+                    <span>বিবরণ</span>
+                    <span>ব্যালেন্স (অনলাইন | ক্যাশ)</span>
+                </div>
+                <ul id="transactions-list-ul"></ul>
+            </div>
             <div id="dues-tab" class="tab-content"><ul id="due-list-ul"></ul></div>
             <div id="payables-tab" class="tab-content"><ul id="payable-list-ul"></ul></div>
             <div id="customers-tab" class="tab-content"><ul id="customer-list-ul"></ul></div>
