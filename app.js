@@ -31,7 +31,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -40,7 +39,6 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-
         if (balanceSnap.exists()) {
             showMainApp();
         } else {
@@ -285,7 +283,7 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
         
-        const customerRef = collectionName === 'due' ? await findOrCreateCustomer(person, phone) : null;
+        const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
 
         const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', 'in', ['unpaid', 'partially-paid']));
         const existingEntrySnap = await getDocs(q);
@@ -624,14 +622,21 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button.delete-btn');
     if (!button) return;
+    
     const listItem = button.closest('li[data-id]');
     if(!listItem) return;
     
     const id = listItem.dataset.id; 
     const type = listItem.dataset.type;
     
-    if (!id || !type || !confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
-    if (type === 'transaction') {
+    if (!id || !type) return;
+
+    if (type === 'customer-delete-btn') { // This is a special case for the customer list
+        if (confirm("আপনি কি এই কাস্টমার এবং তার সমস্ত ডিউ-এর ইতিহাস মুছে ফেলতে নিশ্চিত? এই কাজটি ফেরানো যাবে না।")) {
+            deleteCustomer(id);
+        }
+    } else if (type === 'transaction') {
+        if (!confirm("আপনি কি এই লেনদেনটি মুছে ফেলতে নিশ্চিত?")) return;
         const transRef = doc(db, `users/${currentUser.uid}/transactions/${id}`);
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
         try {
@@ -649,8 +654,6 @@ mainApp.addEventListener('click', async (e) => {
                 t.delete(transRef);
             });
             await takeDailySnapshot();
-            loadTransactionsAndReportForDate(datePicker.valueAsDate);
-            renderMonthlyChart();
         } catch (error) { console.error("Error deleting transaction:", error); alert("লেনদেনটি মুছতে সমস্যা হয়েছে।"); }
     }
 });
