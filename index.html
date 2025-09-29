@@ -22,9 +22,10 @@
     <div id="app-container" style="display: none;">
         <div id="setup-screen" class="container" style="display: none;">
              <h2>প্রাথমিক ব্যালেন্স সেটআপ</h2>
-             <p>আপনার ব্যবসার বর্তমান অনলাইন ও ক্যাশ ব্যালেন্স কত আছে তা লিখুন। অ্যাপ স্বয়ংক্রিয়ভাবে আপনার আগের হিসাব লোড করেছে।</p>
+             <p>আপনার ব্যবসার বর্তমান ব্যালেন্স কত আছে তা লিখুন।</p>
             <input type="number" id="initial-online-balance" placeholder="অনলাইন ব্যালেন্স">
             <input type="number" id="initial-cash-balance" placeholder="ক্যাশ ব্যালেন্স">
+            <input type="number" id="initial-wallet-balance" placeholder="Billpays Wallet ব্যালেন্স">
             <button id="save-initial-balance">সেভ ও এগিয়ে যান</button>
             <button id="skip-balance-setup" class="secondary-btn">এড়িয়ে যান (নতুন ইউজার)</button>
         </div>
@@ -39,6 +40,7 @@
             <div id="dashboard">
                 <div class="card"><h3 class="card-title">বর্তমান অনলাইন</h3><p id="online-balance">৳ 0.00</p></div>
                 <div class="card"><h3 class="card-title">বর্তমান ক্যাশ</h3><p id="cash-balance">৳ 0.00</p></div>
+                <div class="card"><h3 class="card-title">Billpays Wallet</h3><p id="wallet-balance">৳ 0.00</p></div>
             </div>
             <div class="card total-balance-card">
                 <h3 class="card-title">মোট বর্তমান ব্যালেন্স</h3><p id="total-balance">৳ 0.00</p>
@@ -64,9 +66,10 @@
             <form id="transaction-form">
                 <select id="category">
                     <option value="online-income">অনলাইন আয়</option><option value="cash-income">ক্যাশ আয়</option>
+                    <option value="wallet-income">Wallet আয়</option>
                     <option value="online-expense">অনলাইন খরচ</option><option value="cash-expense">ক্যাশ খরচ</option>
-                    <option value="due">ডিউ (বাকি)</option>
-                    <option value="payable">পাওনা (ধার)</option>
+                    <option value="wallet-expense">Wallet খরচ</option>
+                    <option value="due">ডিউ (বাকি)</option><option value="payable">পাওনা (ধার)</option>
                 </select>
                 <input type="number" id="amount" placeholder="পরিমাণ (৳)">
                 <input type="text" id="description" placeholder="বর্ণনা / আইটেম">
@@ -89,7 +92,7 @@
             <div id="transactions-tab" class="tab-content active">
                 <div class="transaction-list-header">
                     <span>বিবরণ</span>
-                    <span>ব্যালেন্স (অনলাইন | ক্যাশ)</span>
+                    <span>ব্যালেন্স</span>
                 </div>
                 <ul id="transactions-list-ul"></ul>
             </div>
