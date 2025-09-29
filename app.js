@@ -12,10 +12,9 @@ enableIndexedDbPersistence(db).catch(err => console.error("Persistence error: ",
 
 // DOM Elements
 const authContainer = document.getElementById('auth-container'), appContainer = document.getElementById('app-container'), setupScreen = document.getElementById('setup-screen'), mainApp = document.getElementById('main-app'), loginBtn = document.getElementById('login-btn'), signupLink = document.getElementById('signup-link'), logoutBtn = document.getElementById('logout-btn'), emailInput = document.getElementById('email'), passwordInput = document.getElementById('password'), datePicker = document.getElementById('date-picker'), categorySelect = document.getElementById('category'), personNameInput = document.getElementById('person-name'), personPhoneInput = document.getElementById('person-phone'), personDetailsDiv = document.getElementById('person-details'), transactionForm = document.getElementById('transaction-form'), modal = document.getElementById('details-modal'), customerModal = document.getElementById('customer-details-modal');
-let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false;
+let currentUser, currentOpenEntryId, currentOpenEntryType, hasCheckedBalance = false, allTransactionsCache = [];
 window.chartInstances = [];
 let allCustomersCache = [];
-let allTransactionsCache = [];
 
 // Auth State Logic
 onAuthStateChanged(auth, user => {
@@ -32,7 +31,6 @@ async function checkInitialBalance() {
     try {
         const balanceSnap = await getDoc(balanceRef);
         hasCheckedBalance = true;
-        
         const lastSnapshotDateStr = localStorage.getItem(`lastSnapshot_${currentUser.uid}`);
         if (lastSnapshotDateStr) {
             const todayStr = getDateId(new Date());
@@ -41,19 +39,15 @@ async function checkInitialBalance() {
                 await takeDailySnapshot(lastDate);
             }
         }
-
         if (balanceSnap.exists()) {
-            const currentData = balanceSnap.data();
-            document.getElementById('initial-online-balance').value = currentData.online || 0;
-            document.getElementById('initial-cash-balance').value = currentData.cash || 0;
-            document.getElementById('initial-wallet-balance').value = currentData.wallet || 0;
+            showMainApp();
         } else {
             document.getElementById('initial-online-balance').value = '';
             document.getElementById('initial-cash-balance').value = '';
             document.getElementById('initial-wallet-balance').value = '';
+            setupScreen.style.display = 'block';
+            mainApp.style.display = 'none';
         }
-        setupScreen.style.display = 'block';
-        mainApp.style.display = 'none';
     } catch (error) { console.error("Error during initial checks:", error); setupScreen.style.display = 'block'; mainApp.style.display = 'none'; }
 }
 
@@ -73,23 +67,10 @@ async function showMainApp() {
 const saveInitialBalanceBtn = document.getElementById('save-initial-balance');
 const skipBalanceSetupBtn = document.getElementById('skip-balance-setup');
 saveInitialBalanceBtn.addEventListener('click', async () => {
-    const online = parseFloat(document.getElementById('initial-online-balance').value);
-    const cash = parseFloat(document.getElementById('initial-cash-balance').value);
-    const wallet = parseFloat(document.getElementById('initial-wallet-balance').value);
-
-    if(isNaN(online) || isNaN(cash) || isNaN(wallet)){
-        alert("Please enter valid numbers for all balance fields.");
-        return;
-    }
-
-    const balanceRef = doc(db, 'users', currentUser.uid, 'balance', 'main');
-    const balanceSnap = await getDoc(balanceRef);
-
-    if (balanceSnap.exists()){
-        await updateDoc(balanceRef, { online, cash, wallet });
-    } else {
-        await setDoc(balanceRef, { online, cash, wallet, initialOnline: online, initialCash: cash, initialWallet: wallet });
-    }
+    const online = parseFloat(document.getElementById('initial-online-balance').value) || 0;
+    const cash = parseFloat(document.getElementById('initial-cash-balance').value) || 0;
+    const wallet = parseFloat(document.getElementById('initial-wallet-balance').value) || 0;
+    await setDoc(doc(db, 'users', currentUser.uid, 'balance', 'main'), { online, cash, wallet, initialOnline: online, initialCash: cash, initialWallet: wallet });
     await takeDailySnapshot(new Date(), { online, cash, wallet });
     showMainApp();
 });
@@ -102,6 +83,13 @@ skipBalanceSetupBtn.addEventListener('click', async () => {
     }
     showMainApp();
 });
+
+async function fetchAllTransactionsOnce() {
+    if (!currentUser) return;
+    const transactionsQuery = query(collection(db, `users/${currentUser.uid}/transactions`), orderBy('timestamp', 'asc'));
+    const transactionsSnap = await getDocs(transactionsQuery);
+    allTransactionsCache = transactionsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+}
 
 function getDateId(date) { return date.toISOString().split('T')[0]; }
 
@@ -232,6 +220,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
         }
     }
 }
+
 
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
