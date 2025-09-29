@@ -674,6 +674,7 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button.delete-btn');
     if (!button) return;
+    
     const listItem = button.closest('li[data-id]');
     if(!listItem) return;
     
@@ -695,10 +696,10 @@ mainApp.addEventListener('click', async (e) => {
                 const bData = balanceDoc.data();
                 if (tData.category === 'online-income') bData.online -= tData.amount;
                 else if (tData.category === 'cash-income') bData.cash -= tData.amount;
-                else if (tData.category === 'wallet-income') bData.wallet -= tData.amount;
+                else if (tData.category === 'wallet-income') bData.wallet = (bData.wallet || 0) - tData.amount;
                 else if (tData.category === 'online-expense') bData.online += tData.amount;
                 else if (tData.category === 'cash-expense') bData.cash += tData.amount;
-                else if (tData.category === 'wallet-expense') bData.wallet += tData.amount;
+                else if (tData.category === 'wallet-expense') bData.wallet = (bData.wallet || 0) + tData.amount;
                 t.update(balanceRef, bData);
                 t.delete(transRef);
             });
