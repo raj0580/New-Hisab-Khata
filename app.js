@@ -233,7 +233,7 @@ async function renderMonthlyChart() {
         window.chartInstances.forEach(instance => instance.destroy());
     }
     
-    const labels = [], onlineData = [], cashData = []; // Wallet data can be added here if needed
+    const labels = [], onlineData = [], cashData = [];
     for (let i = 29; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString('bn-BD', {day: 'numeric', month: 'short'}));
@@ -331,19 +331,10 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     if (isDueOrPayable) {
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
-        
         const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
-
         const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', 'in', ['unpaid', 'partially-paid']));
         const existingEntrySnap = await getDocs(q);
-
-        let entryRef;
-        if (existingEntrySnap.empty) {
-            entryRef = doc(collection(db, `users/${currentUser.uid}/${collectionName}`));
-        } else {
-            entryRef = existingEntrySnap.docs[0].ref;
-        }
-
+        let entryRef = existingEntrySnap.empty ? doc(collection(db, `users/${currentUser.uid}/${collectionName}`)) : existingEntrySnap.docs[0].ref;
         try {
             await runTransaction(db, async (transaction) => {
                 const docSnap = await transaction.get(entryRef);
@@ -360,19 +351,12 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
                     if (phone && !docSnap.data().phoneNumber) updateData.phoneNumber = phone;
                     transaction.update(entryRef, updateData);
                 }
-                
                 transaction.set(doc(collection(entryRef, 'items')), data);
-
                 if(customerRef){
-                    transaction.update(customerRef, {
-                        totalDueAmount: increment(amount),
-                        currentDue: increment(amount),
-                        lastActivity: serverTimestamp()
-                    });
+                    transaction.update(customerRef, { totalDueAmount: increment(amount), currentDue: increment(amount), lastActivity: serverTimestamp() });
                 }
             });
         } catch (e) { console.error("Transaction failed: ", e); }
-
     } else {
         await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
@@ -380,11 +364,11 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
             const balanceDoc = await t.get(balanceRef);
             if (!balanceDoc.exists()) throw "Balance doc not found";
             const b = balanceDoc.data();
-            if (category === 'online-income') b.online += amount; 
-            else if (category === 'cash-income') b.cash += amount;
+            if (category === 'online-income') b.online = (b.online || 0) + amount;
+            else if (category === 'cash-income') b.cash = (b.cash || 0) + amount;
             else if (category === 'wallet-income') b.wallet = (b.wallet || 0) + amount;
-            else if (category === 'online-expense') b.online -= amount; 
-            else if (category === 'cash-expense') b.cash -= amount;
+            else if (category === 'online-expense') b.online = (b.online || 0) - amount;
+            else if (category === 'cash-expense') b.cash = (b.cash || 0) - amount;
             else if (category === 'wallet-expense') b.wallet = (b.wallet || 0) - amount;
             t.update(balanceRef, b);
         });
