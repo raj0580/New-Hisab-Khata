@@ -221,7 +221,6 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     }
 }
 
-
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
     const yAxisCanvasLeft = document.getElementById('y-axis-chart-left');
@@ -675,7 +674,6 @@ document.getElementById('add-payment-btn').addEventListener('click', async () =>
 mainApp.addEventListener('click', async (e) => {
     const button = e.target.closest('button.delete-btn');
     if (!button) return;
-    
     const listItem = button.closest('li[data-id]');
     if(!listItem) return;
     
