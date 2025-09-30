@@ -221,6 +221,7 @@ async function loadTransactionsAndReportForDate(selectedDate) {
     }
 }
 
+
 async function renderMonthlyChart() {
     const mainCanvas = document.getElementById('monthly-chart');
     const yAxisCanvasLeft = document.getElementById('y-axis-chart-left');
@@ -331,19 +332,10 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
     if (isDueOrPayable) {
         const collectionName = category === 'due' ? 'dues' : 'payables';
         const nameField = category === 'due' ? 'customerName' : 'personName';
-        
         const customerRef = collectionName === 'dues' ? await findOrCreateCustomer(person, phone) : null;
-
         const q = query(collection(db, `users/${currentUser.uid}/${collectionName}`), where(nameField, '==', person), where('status', 'in', ['unpaid', 'partially-paid']));
         const existingEntrySnap = await getDocs(q);
-
-        let entryRef;
-        if (existingEntrySnap.empty) {
-            entryRef = doc(collection(db, `users/${currentUser.uid}/${collectionName}`));
-        } else {
-            entryRef = existingEntrySnap.docs[0].ref;
-        }
-
+        let entryRef = existingEntrySnap.empty ? doc(collection(db, `users/${currentUser.uid}/${collectionName}`)) : existingEntrySnap.docs[0].ref;
         try {
             await runTransaction(db, async (transaction) => {
                 const docSnap = await transaction.get(entryRef);
@@ -360,19 +352,12 @@ document.getElementById('add-transaction-btn').addEventListener('click', async (
                     if (phone && !docSnap.data().phoneNumber) updateData.phoneNumber = phone;
                     transaction.update(entryRef, updateData);
                 }
-                
                 transaction.set(doc(collection(entryRef, 'items')), data);
-
                 if(customerRef){
-                    transaction.update(customerRef, {
-                        totalDueAmount: increment(amount),
-                        currentDue: increment(amount),
-                        lastActivity: serverTimestamp()
-                    });
+                    transaction.update(customerRef, { totalDueAmount: increment(amount), currentDue: increment(amount), lastActivity: serverTimestamp() });
                 }
             });
         } catch (e) { console.error("Transaction failed: ", e); }
-
     } else {
         await addDoc(collection(db, `users/${currentUser.uid}/transactions`), { category, amount, description, type: category.includes('income')?'income':'expense', timestamp: serverTimestamp() });
         const balanceRef = doc(db, `users/${currentUser.uid}/balance/main`);
